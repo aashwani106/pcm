@@ -97,6 +97,6 @@ The app follows a **Premium Minimalist** aesthetic to ensure ease of use for par
 
 ## 📄 Documentation
 For more detailed technical information, refer to:
-*   [Requirements](./requirement.md)
-*   [High-Level Design](./hld.md)
-*   [Project Structure](./project-structure.md)
+*   [Requirements](./docs/requirement.md)
+*   [High-Level Design](./docs/hld.md)
+*   [Project Structure](./docs/project-structure.md)

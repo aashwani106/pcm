@@ -1,5 +1,5 @@
 # Coaching Institute Mobile App – Requirements
-
+    name - PCM 
 ## Overview
 A mobile application for a local coaching institute (~200 students) to manage:
 - Attendance (anti-proxy)
@@ -38,6 +38,21 @@ The app will be built using **free-tier resources only** and designed for scalab
 - Attendance allowed only within a **fixed time window**
 - One attendance per student per day
 - Attendance blocked on declared holidays
+
+Student opens Attendance screen
+        ↓
+App checks GPS location
+        ↓
+Inside allowed radius?
+   ├─ No → show error
+   └─ Yes
+        ↓
+Check: already marked today?
+   ├─ Yes → block
+   └─ No
+        ↓
+Insert attendance record
+
 
 ---
 

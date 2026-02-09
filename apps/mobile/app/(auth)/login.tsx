@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { Colors, Spacing, Typography } from '../../constants/theme'; // Removed Shadows since it wasn't used in previous version or can be simplified
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FeedbackPopup, FeedbackType } from '../../components/feedback-popup';
 import Animated, {
     FadeInDown,
     FadeInUp,
@@ -66,13 +67,35 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [popup, setPopup] = useState<{
+        visible: boolean;
+        type: FeedbackType;
+        title: string;
+        message: string;
+    }>({
+        visible: false,
+        type: 'success',
+        title: '',
+        message: '',
+    });
+
+    function showPopup(type: FeedbackType, title: string, message: string) {
+        setPopup({ visible: true, type, title, message });
+    }
 
     const login = async () => {
         if (!email || !password) return;
-        setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-            alert(error.message);
+        try {
+            setLoading(true);
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                showPopup('error', 'Login Failed', error.message);
+                return;
+            }
+            showPopup('success', 'Success', 'Logged in successfully.');
+        } catch {
+            showPopup('warning', 'Try Again', 'Unable to login right now. Please try again.');
+        } finally {
             setLoading(false);
         }
     };
@@ -81,6 +104,13 @@ export default function LoginScreen() {
 
     return (
         <View style={styles.container}>
+            <FeedbackPopup
+                visible={popup.visible}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                onClose={() => setPopup((prev) => ({ ...prev, visible: false }))}
+            />
             {/* Background Layer */}
             <LinearGradient
                 colors={['#FFFFFF', '#FDFBF7', '#F5F5DC']}

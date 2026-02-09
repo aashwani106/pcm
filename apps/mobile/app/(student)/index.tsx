@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
@@ -6,8 +7,9 @@ import { useAttendanceLocation } from '../../hooks/useAttendanceLocation';
 import { useAttendanceChecks } from '../../hooks/useAttendanceChecks';
 import { getDistanceAndInside } from '../../utils/distance';
 import { supabase } from '../../services/supabase';
-import { markAttendance } from '../../services/backend';
+import { getReadableErrorMessage, markAttendance } from '../../services/backend';
 import { isWithinTimeWindow, getTimeWindowStatus } from '../../utils/timeWindow';
+import { FeedbackPopup, FeedbackType } from '../../components/feedback-popup';
 import {
     COACHING_LATITUDE,
     COACHING_LONGITUDE,
@@ -75,6 +77,18 @@ function resolveAttendanceStatus(
 
 export default function StudentAttendanceScreen() {
     const { session } = useAuth();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [popup, setPopup] = useState<{
+        visible: boolean;
+        type: FeedbackType;
+        title: string;
+        message: string;
+    }>({
+        visible: false,
+        type: 'success',
+        title: '',
+        message: '',
+    });
     const {
         locationPermission,
         currentLatitude,
@@ -109,7 +123,7 @@ export default function StudentAttendanceScreen() {
         isInsidePremises
     );
     const statusDisplay = getStatusDisplay(status);
-    const canMarkAttendance = status === 'open';
+    const canMarkAttendance = status === 'open' && !isSubmitting;
 
     const accuracyPoor = hasLocation && !isAccuracyAcceptable;
     const locationStatusText =
@@ -130,33 +144,43 @@ export default function StudentAttendanceScreen() {
                 ? `${(distanceResult.distanceInMeters / 1000).toFixed(1)} km`
                 : `${Math.round(distanceResult.distanceInMeters)} m`;
 
-    async function handleMarkAttendance() {
-        try {
-            // Alert.alert('Marking attendance...');
+    function showPopup(type: FeedbackType, title: string, message: string) {
+        setPopup({ visible: true, type, title, message });
+    }
 
+    async function handleMarkAttendance() {
+        setIsSubmitting(true);
+        try {
             const { data, error } = await supabase.auth.getSession();
             if (error) {
                 throw new Error(error.message);
             }
             const session = data.session;
-            console.log('ACCESS TOKEN:', session?.access_token);
             if (!session) {
                 throw new Error('Not authenticated');
             }
             const token = session.access_token;
             if (!token) throw new Error('Not authenticated');
 
-            await markAttendance(token);
-            // Re-run checks after success
-            
-            refreshChecks();
-        } catch (error: any) {
-            console.error('Error marking attendance:', error);
+            const response = await markAttendance(token);
+            showPopup('success', 'Success', response.message || 'Attendance marked successfully.');
+            await refreshChecks();
+        } catch (error: unknown) {
+            showPopup('error', 'Attendance Error', getReadableErrorMessage(error, 'Failed to mark attendance.'));
+        } finally {
+            setIsSubmitting(false);
         }
     }
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
+            <FeedbackPopup
+                visible={popup.visible}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                onClose={() => setPopup((prev) => ({ ...prev, visible: false }))}
+            />
             <View style={styles.content}>
                 <Text style={styles.title}>Attendance</Text>
                 <Text style={styles.subtitle}>Mark your attendance for today</Text>
@@ -223,7 +247,9 @@ export default function StudentAttendanceScreen() {
                     onPress={handleMarkAttendance }
                     disabled={!canMarkAttendance}
                 >
-                    <Text style={[styles.ctaText, !canMarkAttendance && styles.ctaTextDisabled]}>Mark Attendance</Text>
+                    <Text style={[styles.ctaText, !canMarkAttendance && styles.ctaTextDisabled]}>
+                        {isSubmitting ? 'Marking...' : 'Mark Attendance'}
+                    </Text>
                 </Pressable>
             </View>
         </SafeAreaView>

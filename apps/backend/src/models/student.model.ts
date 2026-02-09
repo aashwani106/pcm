@@ -24,10 +24,21 @@ export async function findStudentById(studentId: string) {
 }
 
 export async function findStudentByUserId(userId: string) {
-  return supabaseAdmin
+  const byUserId = await supabaseAdmin
     .from('students')
     .select('id, user_id, parent_id, batch, created_at')
     .eq('user_id', userId)
+    .maybeSingle();
+
+  if (byUserId.error || byUserId.data) {
+    return byUserId;
+  }
+
+  // Fallback for databases where the student row is keyed directly by auth user id.
+  return supabaseAdmin
+    .from('students')
+    .select('id, user_id, parent_id, batch, created_at')
+    .eq('id', userId)
     .maybeSingle();
 }
 

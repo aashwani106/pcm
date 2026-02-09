@@ -26,7 +26,7 @@ export async function getStudentSelfAttendanceCalendar(userId: string, month: st
     throw new ApiError(500, 'Failed to load student account', error);
   }
   if (!student) {
-    throw new ApiError(404, 'Student profile not found');
+    throw new ApiError(404, 'Student profile not found. Ask admin to link this account to a student.');
   }
 
   return getStudentAttendanceCalendar(student.id, month);

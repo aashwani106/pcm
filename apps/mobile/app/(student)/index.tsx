@@ -172,6 +172,14 @@ export default function StudentAttendanceScreen() {
         }
     }
 
+    async function handleLogout() {
+        try {
+            await supabase.auth.signOut();
+        } catch {
+            showPopup('error', 'Logout Error', 'Unable to logout right now. Please try again.');
+        }
+    }
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <FeedbackPopup
@@ -182,6 +190,11 @@ export default function StudentAttendanceScreen() {
                 onClose={() => setPopup((prev) => ({ ...prev, visible: false }))}
             />
             <View style={styles.content}>
+                <View style={styles.topActions}>
+                    <Pressable onPress={handleLogout} style={styles.logoutButton}>
+                        <Text style={styles.logoutText}>Logout</Text>
+                    </Pressable>
+                </View>
                 <Text style={styles.title}>Attendance</Text>
                 <Text style={styles.subtitle}>Mark your attendance for today</Text>
 
@@ -265,6 +278,24 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: Spacing.lg,
         paddingTop: Spacing.xl,
+    },
+    topActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: Spacing.sm,
+    },
+    logoutButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: Colors.white,
+        borderColor: Colors.border,
+        borderWidth: 1,
+    },
+    logoutText: {
+        fontFamily: Typography.medium,
+        fontSize: 13,
+        color: Colors.textMuted,
     },
     title: {
         fontFamily: Typography.heading,

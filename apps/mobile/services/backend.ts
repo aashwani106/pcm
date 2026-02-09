@@ -13,6 +13,43 @@ export interface MarkAttendanceData {
   status: 'present';
 }
 
+export interface AdminAttendanceRecord {
+  student_id: string;
+  name: string;
+  status: 'present' | 'absent';
+  marked_at: string | null;
+  accuracy: number | null;
+}
+
+export interface AdminAttendanceResponseData {
+  date: string;
+  summary: {
+    total: number;
+    present: number;
+    absent: number;
+  };
+  records: AdminAttendanceRecord[];
+}
+
+export interface AbsentNotificationsRunData {
+  date: string;
+  absent_students: number;
+  eligible_parents: number;
+  created_notifications: number;
+}
+
+export interface ParentNotification {
+  id: string;
+  parent_user_id: string;
+  student_id: string;
+  date: string;
+  type: 'attendance_absent';
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
 export class ApiRequestError extends Error {
   public readonly status: number;
   public readonly details: unknown;
@@ -59,6 +96,65 @@ export async function markAttendance(accessToken: string): Promise<ApiResponse<M
   });
 
   return parseApiResponse<MarkAttendanceData>(res);
+}
+
+export async function getAdminAttendance(
+  accessToken: string,
+  date: string
+): Promise<ApiResponse<AdminAttendanceResponseData>> {
+  const res = await fetch(`${BACKEND_URL}/admin/attendance?date=${encodeURIComponent(date)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<AdminAttendanceResponseData>(res);
+}
+
+export async function runAbsentNotifications(
+  accessToken: string,
+  date: string
+): Promise<ApiResponse<AbsentNotificationsRunData>> {
+  const res = await fetch(
+    `${BACKEND_URL}/notifications/admin/absent/run?date=${encodeURIComponent(date)}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return parseApiResponse<AbsentNotificationsRunData>(res);
+}
+
+export async function getParentNotifications(
+  accessToken: string,
+  limit = 100
+): Promise<ApiResponse<ParentNotification[]>> {
+  const res = await fetch(`${BACKEND_URL}/notifications/parent?limit=${limit}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<ParentNotification[]>(res);
+}
+
+export async function markParentNotificationRead(
+  accessToken: string,
+  id: string
+): Promise<ApiResponse<{ id: string; is_read: boolean }>> {
+  const res = await fetch(`${BACKEND_URL}/notifications/parent/${id}/read`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<{ id: string; is_read: boolean }>(res);
 }
 
 export { getReadableErrorMessage };

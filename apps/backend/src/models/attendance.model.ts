@@ -7,6 +7,12 @@ export interface AttendanceInsert {
   markedAt: string;
 }
 
+export interface AttendanceByDateRow {
+  student_id: string;
+  status: string | null;
+  marked_at: string | null;
+}
+
 export async function findAttendanceByStudentAndDate(studentId: string, date: string) {
   return supabaseAdmin
     .from('attendance')
@@ -23,4 +29,11 @@ export async function insertAttendance(input: AttendanceInsert) {
     status: input.status,
     marked_at: input.markedAt,
   });
+}
+
+export async function listAttendanceByDate(date: string) {
+  return supabaseAdmin
+    .from('attendance')
+    .select('student_id, status, marked_at')
+    .eq('date', date);
 }

@@ -26,3 +26,7 @@ export function requireRole(role: 'student' | 'admin' | 'parent') {
     }
   };
 }
+
+export const requireStudent = requireRole('student');
+export const requireAdmin = requireRole('admin');
+export const requireParent = requireRole('parent');

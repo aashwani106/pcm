@@ -24,5 +24,5 @@ export const ATTENDANCE_START_HOUR = 7;
 export const ATTENDANCE_START_MINUTE = 30;
 
 /** Attendance window: end (local time). */
-export const ATTENDANCE_END_HOUR = 8;
+export const ATTENDANCE_END_HOUR = 18;
 export const ATTENDANCE_END_MINUTE = 15;

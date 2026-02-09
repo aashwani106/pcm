@@ -1,10 +1,12 @@
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { useAttendanceLocation } from '../../hooks/useAttendanceLocation';
 import { useAttendanceChecks } from '../../hooks/useAttendanceChecks';
 import { getDistanceAndInside } from '../../utils/distance';
+import { supabase } from '../../services/supabase';
+import { markAttendance } from '../../services/backend';
 import { isWithinTimeWindow, getTimeWindowStatus } from '../../utils/timeWindow';
 import {
     COACHING_LATITUDE,
@@ -69,6 +71,8 @@ function resolveAttendanceStatus(
     return 'open';
 }
 
+
+
 export default function StudentAttendanceScreen() {
     const { session } = useAuth();
     const {
@@ -87,12 +91,12 @@ export default function StudentAttendanceScreen() {
     const distanceResult =
         hasLocation
             ? getDistanceAndInside(
-                  currentLatitude,
-                  currentLongitude,
-                  COACHING_LATITUDE,
-                  COACHING_LONGITUDE,
-                  ATTENDANCE_RADIUS_METERS
-              )
+                currentLatitude,
+                currentLongitude,
+                COACHING_LATITUDE,
+                COACHING_LONGITUDE,
+                ATTENDANCE_RADIUS_METERS
+            )
             : null;
     const isInsidePremises = distanceResult?.isInsidePremises ?? false;
 
@@ -125,6 +129,31 @@ export default function StudentAttendanceScreen() {
             : distanceResult.distanceInMeters >= 1000
                 ? `${(distanceResult.distanceInMeters / 1000).toFixed(1)} km`
                 : `${Math.round(distanceResult.distanceInMeters)} m`;
+
+    async function handleMarkAttendance() {
+        try {
+            // Alert.alert('Marking attendance...');
+
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+                throw new Error(error.message);
+            }
+            const session = data.session;
+            console.log('ACCESS TOKEN:', session?.access_token);
+            if (!session) {
+                throw new Error('Not authenticated');
+            }
+            const token = session.access_token;
+            if (!token) throw new Error('Not authenticated');
+
+            await markAttendance(token);
+            // Re-run checks after success
+            
+            refreshChecks();
+        } catch (error: any) {
+            console.error('Error marking attendance:', error);
+        }
+    }
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -191,7 +220,7 @@ export default function StudentAttendanceScreen() {
                         pressed && canMarkAttendance && styles.ctaButtonPressed,
                         !canMarkAttendance && styles.ctaButtonDisabled,
                     ]}
-                    onPress={() => {}}
+                    onPress={handleMarkAttendance }
                     disabled={!canMarkAttendance}
                 >
                     <Text style={[styles.ctaText, !canMarkAttendance && styles.ctaTextDisabled]}>Mark Attendance</Text>

@@ -14,3 +14,27 @@ export async function listStudents() {
     .select('id, user_id, parent_id, batch, created_at')
     .order('id', { ascending: true });
 }
+
+export async function findStudentById(studentId: string) {
+  return supabaseAdmin
+    .from('students')
+    .select('id, user_id, parent_id, batch, created_at')
+    .eq('id', studentId)
+    .maybeSingle();
+}
+
+export async function findStudentByUserId(userId: string) {
+  return supabaseAdmin
+    .from('students')
+    .select('id, user_id, parent_id, batch, created_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+}
+
+export async function listStudentsByParentUserId(parentUserId: string) {
+  return supabaseAdmin
+    .from('students')
+    .select('id, user_id, parent_id, batch, created_at')
+    .eq('parent_id', parentUserId)
+    .order('created_at', { ascending: true });
+}

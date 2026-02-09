@@ -1,16 +1,17 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme';
 import { AdminAttendanceRecord } from '../../services/backend';
 
 interface AttendanceRowProps {
   record: AdminAttendanceRecord;
+  onPress?: () => void;
 }
 
-export function AttendanceRow({ record }: AttendanceRowProps) {
+export function AttendanceRow({ record, onPress }: AttendanceRowProps) {
   const isPresent = record.status === 'present';
 
   return (
-    <View style={styles.row}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
       <View style={styles.main}>
         <Text style={styles.name}>{record.name}</Text>
         <View style={[styles.badge, isPresent ? styles.badgePresent : styles.badgeAbsent]}>
@@ -28,7 +29,7 @@ export function AttendanceRow({ record }: AttendanceRowProps) {
           {record.accuracy != null ? `Accuracy: ${Math.round(record.accuracy)}m` : 'Accuracy: -'}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -40,6 +41,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: Spacing.sm,
+  },
+  rowPressed: {
+    opacity: 0.92,
   },
   main: {
     flexDirection: 'row',

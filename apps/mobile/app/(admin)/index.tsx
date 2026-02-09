@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { AttendanceRow } from '../../components/admin/attendance-row';
 import { FeedbackPopup, FeedbackType } from '../../components/feedback-popup';
 import { SummaryCard } from '../../components/admin/summary-card';
@@ -94,6 +95,7 @@ function SummaryCards({ summary }: { summary: AdminAttendanceResponseData['summa
 }
 
 export default function AdminDashboardScreen() {
+  const router = useRouter();
   const { session, loading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState(toLocalISODate(new Date()));
   const [data, setData] = useState<AdminAttendanceResponseData | null>(null);
@@ -255,7 +257,17 @@ export default function AdminDashboardScreen() {
             <Text style={styles.listTitle}>Attendance List</Text>
           </View>
         }
-        renderItem={({ item }) => <AttendanceRow record={item} />}
+        renderItem={({ item }) => (
+          <AttendanceRow
+            record={item}
+            onPress={() =>
+              router.push({
+                pathname: '/(admin)/student/[studentId]',
+                params: { studentId: item.student_id, date: selectedDate, name: item.name },
+              })
+            }
+          />
+        )}
         ListEmptyComponent={
           <View style={styles.stateContainer}>
             {state === 'loading' ? (

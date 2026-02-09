@@ -1,0 +1,1 @@
+# Add python dependencies for face recognition service here

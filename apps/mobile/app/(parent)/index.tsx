@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { NotificationRow } from '../../components/parent/notification-row';
 import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
@@ -23,6 +24,7 @@ import { supabase } from '../../services/supabase';
 type ParentState = 'loading' | 'success' | 'empty' | 'error';
 
 export default function ParentDashboard() {
+  const router = useRouter();
   const { session, loading: authLoading } = useAuth();
   const [items, setItems] = useState<ParentNotification[]>([]);
   const [state, setState] = useState<ParentState>('loading');
@@ -110,6 +112,9 @@ export default function ParentDashboard() {
             <Text style={styles.title}>Parent Alerts</Text>
             <Text style={styles.subtitle}>Attendance updates from the institute</Text>
             <View style={styles.topActions}>
+              <Pressable onPress={() => router.push('/(parent)/calendar')} style={styles.calendarButton}>
+                <Text style={styles.calendarText}>Calendar</Text>
+              </Pressable>
               <Pressable onPress={handleLogout} style={styles.logoutButton}>
                 <Text style={styles.logoutText}>Logout</Text>
               </Pressable>
@@ -178,7 +183,21 @@ const styles = StyleSheet.create({
   topActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: Spacing.sm,
     marginBottom: Spacing.xs,
+  },
+  calendarButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.background,
+    borderColor: Colors.border,
+    borderWidth: 1,
+  },
+  calendarText: {
+    fontFamily: Typography.medium,
+    fontSize: 13,
+    color: Colors.primary,
   },
   logoutButton: {
     paddingHorizontal: 14,

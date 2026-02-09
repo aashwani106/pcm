@@ -5,7 +5,6 @@ import { getTodayLocalISODate } from '../utils/date';
 import { isWithinTimeWindow } from '../utils/timeWindow';
 
 export async function markAttendanceForStudent(studentId: string) {
-  console.log('Marking attendance for student:', studentId);
   if (!isWithinTimeWindow()) {
     throw new ApiError(400, 'Attendance window closed');
   }
@@ -33,11 +32,12 @@ export async function markAttendanceForStudent(studentId: string) {
     date: today,
     status: 'present',
     markedAt: new Date().toISOString(),
+    markedBy: 'student',
+    remark: null,
   });
 
-  console.log('Attendance marked successfully for student:', insertError);
   if (insertError) {
-    throw new ApiError(500, 'Failed to mark attendance...', insertError);
+    throw new ApiError(500, 'Failed to mark attendance', insertError);
   }
 
   return { studentId, date: today, status: 'present' as const };

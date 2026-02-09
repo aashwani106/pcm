@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { useAttendanceLocation } from '../../hooks/useAttendanceLocation';
@@ -76,6 +77,7 @@ function resolveAttendanceStatus(
 
 
 export default function StudentAttendanceScreen() {
+    const router = useRouter();
     const { session } = useAuth();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [popup, setPopup] = useState<{
@@ -191,6 +193,9 @@ export default function StudentAttendanceScreen() {
             />
             <View style={styles.content}>
                 <View style={styles.topActions}>
+                    <Pressable onPress={() => router.push('/(student)/calendar')} style={styles.calendarButton}>
+                        <Text style={styles.calendarText}>Calendar</Text>
+                    </Pressable>
                     <Pressable onPress={handleLogout} style={styles.logoutButton}>
                         <Text style={styles.logoutText}>Logout</Text>
                     </Pressable>
@@ -282,7 +287,21 @@ const styles = StyleSheet.create({
     topActions: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
+        gap: Spacing.sm,
         marginBottom: Spacing.sm,
+    },
+    calendarButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: Colors.white,
+        borderColor: Colors.border,
+        borderWidth: 1,
+    },
+    calendarText: {
+        fontFamily: Typography.medium,
+        fontSize: 13,
+        color: Colors.primary,
     },
     logoutButton: {
         paddingHorizontal: 14,

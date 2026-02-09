@@ -1,4 +1,5 @@
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL!;
+const REQUEST_TIMEOUT_MS = 10000;
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -50,6 +51,68 @@ export interface ParentNotification {
   created_at: string;
 }
 
+export interface AttendanceWindowSummary {
+  days: number;
+  present: number;
+  absent: number;
+  percentage: number;
+}
+
+export interface AdminStudentAttendanceHistoryData {
+  student_id: string;
+  name: string;
+  date: string;
+  attendance_percentage: number;
+  last_7_days: AttendanceWindowSummary;
+  last_30_days: AttendanceWindowSummary;
+  absent_streak: number;
+}
+
+export interface AdminAttendanceCalendarDay {
+  status: 'present' | 'absent';
+  marked_at: string | null;
+  marked_by: 'student' | 'admin' | null;
+  remark: string | null;
+}
+
+export interface AdminStudentAttendanceCalendarData {
+  student: {
+    id: string;
+    name: string;
+    batch: string | null;
+  };
+  month: string;
+  attendance_by_date: Record<string, AdminAttendanceCalendarDay>;
+  holidays: string[];
+}
+
+export interface ParentCalendarData {
+  selected_student_id: string;
+  children: Array<{
+    id: string;
+    name: string;
+    batch: string | null;
+  }>;
+  calendar: AdminStudentAttendanceCalendarData;
+}
+
+export interface AdminManualAttendanceInput {
+  student_id: string;
+  status: 'present' | 'absent';
+  remark: string;
+  date: string;
+}
+
+export interface AdminManualAttendanceResult {
+  student_id: string;
+  date: string;
+  status: 'present' | 'absent';
+  marked_by: 'admin';
+  remark: string;
+  action: 'created' | 'updated';
+  attendance_id: string | null;
+}
+
 export class ApiRequestError extends Error {
   public readonly status: number;
   public readonly details: unknown;
@@ -86,8 +149,24 @@ async function parseApiResponse<T>(res: Response): Promise<ApiResponse<T>> {
   return data;
 }
 
+async function requestWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiRequestError('Request timed out. Check backend connection.', 408);
+    }
+    throw new ApiRequestError('Network request failed. Check backend URL/server.', 0, error);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function markAttendance(accessToken: string): Promise<ApiResponse<MarkAttendanceData>> {
-  const res = await fetch(`${BACKEND_URL}/attendance/mark`, {
+  const res = await requestWithTimeout(`${BACKEND_URL}/attendance/mark`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -102,7 +181,9 @@ export async function getAdminAttendance(
   accessToken: string,
   date: string
 ): Promise<ApiResponse<AdminAttendanceResponseData>> {
-  const res = await fetch(`${BACKEND_URL}/admin/attendance?date=${encodeURIComponent(date)}`, {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/admin/attendance?date=${encodeURIComponent(date)}`,
+    {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -112,11 +193,101 @@ export async function getAdminAttendance(
   return parseApiResponse<AdminAttendanceResponseData>(res);
 }
 
+export async function getAdminStudentAttendanceHistory(
+  accessToken: string,
+  studentId: string,
+  date: string
+): Promise<ApiResponse<AdminStudentAttendanceHistoryData>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/admin/students/${encodeURIComponent(
+      studentId
+    )}/attendance-history?date=${encodeURIComponent(date)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return parseApiResponse<AdminStudentAttendanceHistoryData>(res);
+}
+
+export async function getAdminStudentAttendanceCalendar(
+  accessToken: string,
+  studentId: string,
+  month: string
+): Promise<ApiResponse<AdminStudentAttendanceCalendarData>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/admin/students/${encodeURIComponent(
+      studentId
+    )}/attendance-calendar?month=${encodeURIComponent(month)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return parseApiResponse<AdminStudentAttendanceCalendarData>(res);
+}
+
+export async function getStudentAttendanceCalendar(
+  accessToken: string,
+  month: string
+): Promise<ApiResponse<AdminStudentAttendanceCalendarData>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/calendar/student?month=${encodeURIComponent(month)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+  return parseApiResponse<AdminStudentAttendanceCalendarData>(res);
+}
+
+export async function getParentAttendanceCalendar(
+  accessToken: string,
+  month: string,
+  studentId?: string
+): Promise<ApiResponse<ParentCalendarData>> {
+  const studentParam = studentId ? `&student_id=${encodeURIComponent(studentId)}` : '';
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/calendar/parent?month=${encodeURIComponent(month)}${studentParam}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+  return parseApiResponse<ParentCalendarData>(res);
+}
+
+export async function markAdminManualAttendance(
+  accessToken: string,
+  input: AdminManualAttendanceInput
+): Promise<ApiResponse<AdminManualAttendanceResult>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/admin/attendance/manual`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseApiResponse<AdminManualAttendanceResult>(res);
+}
+
 export async function runAbsentNotifications(
   accessToken: string,
   date: string
 ): Promise<ApiResponse<AbsentNotificationsRunData>> {
-  const res = await fetch(
+  const res = await requestWithTimeout(
     `${BACKEND_URL}/notifications/admin/absent/run?date=${encodeURIComponent(date)}`,
     {
       method: 'POST',
@@ -133,7 +304,7 @@ export async function getParentNotifications(
   accessToken: string,
   limit = 100
 ): Promise<ApiResponse<ParentNotification[]>> {
-  const res = await fetch(`${BACKEND_URL}/notifications/parent?limit=${limit}`, {
+  const res = await requestWithTimeout(`${BACKEND_URL}/notifications/parent?limit=${limit}`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -147,7 +318,7 @@ export async function markParentNotificationRead(
   accessToken: string,
   id: string
 ): Promise<ApiResponse<{ id: string; is_read: boolean }>> {
-  const res = await fetch(`${BACKEND_URL}/notifications/parent/${id}/read`, {
+  const res = await requestWithTimeout(`${BACKEND_URL}/notifications/parent/${id}/read`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,

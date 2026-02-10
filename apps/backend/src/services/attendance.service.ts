@@ -1,13 +1,24 @@
 import { findAttendanceByStudentAndDate, insertAttendance } from '../models/attendance.model';
 import { findHolidayByDate } from '../models/holiday.model';
+import { findStudentByUserId } from '../models/student.model';
 import { ApiError } from '../utils/ApiError';
 import { getTodayLocalISODate } from '../utils/date';
 import { isWithinTimeWindow } from '../utils/timeWindow';
 
-export async function markAttendanceForStudent(studentId: string) {
+export async function markAttendanceForStudent(userId: string) {
   if (!isWithinTimeWindow()) {
     throw new ApiError(400, 'Attendance window closed');
   }
+
+  const { data: student, error: studentError } = await findStudentByUserId(userId);
+  if (studentError) {
+    throw new ApiError(500, 'Failed to load student account', studentError);
+  }
+  if (!student) {
+    throw new ApiError(404, 'Student profile not found. Ask admin to link this account.');
+  }
+
+  const studentId = student.id;
 
   const today = getTodayLocalISODate();
 

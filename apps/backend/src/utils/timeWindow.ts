@@ -1,6 +1,6 @@
 const START_HOUR = Number(process.env.ATTENDANCE_START_HOUR ?? 7);
 const START_MIN = Number(process.env.ATTENDANCE_START_MINUTE ?? 30);
-const END_HOUR = Number(process.env.ATTENDANCE_END_HOUR ?? 18);
+const END_HOUR = Number(process.env.ATTENDANCE_END_HOUR ?? 23);
 const END_MIN = Number(process.env.ATTENDANCE_END_MINUTE ?? 15);
 
 export function isWithinTimeWindow(now = new Date()): boolean {

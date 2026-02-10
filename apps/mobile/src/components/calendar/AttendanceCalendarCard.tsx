@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { BorderRadius, Colors, Spacing, Typography } from '../../../constants/theme';
@@ -28,6 +29,10 @@ interface AttendanceCalendarCardProps {
   state: ScreenState;
   message?: string;
   showLegend?: boolean;
+  manualOverride?: {
+    loading?: boolean;
+    onSubmit: (input: { date: string; status: 'present' | 'absent'; remark: string }) => Promise<void> | void;
+  };
 }
 
 const WEEK_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -40,8 +45,10 @@ export function AttendanceCalendarCard({
   state,
   message = 'Unable to load attendance calendar.',
   showLegend = false,
+  manualOverride,
 }: AttendanceCalendarCardProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [remark, setRemark] = useState('');
   const holidaysSet = useMemo(() => new Set(holidays), [holidays]);
   const cells = useMemo(() => buildMonthGrid(month), [month]);
   const todayISO = toLocalISODate(new Date());
@@ -62,6 +69,19 @@ export function AttendanceCalendarCard({
     };
   }, [attendanceByDate, holidaysSet, selectedDate, todayISO]);
 
+  const canManualOverride = Boolean(
+    manualOverride && selectedDetail && selectedDetail.status !== 'future' && selectedDetail.status !== 'holiday'
+  );
+
+  async function handleManualOverride(status: 'present' | 'absent') {
+    if (!manualOverride || !selectedDetail) return;
+    const trimmedRemark = remark.trim();
+    if (!trimmedRemark) return;
+    await manualOverride.onSubmit({ date: selectedDetail.date, status, remark: trimmedRemark });
+    setSelectedDate(null);
+    setRemark('');
+  }
+
   return (
     <>
       <Modal
@@ -78,6 +98,47 @@ export function AttendanceCalendarCard({
             <Text style={styles.modalText}>Marked Time: {selectedDetail?.marked_at ?? '-'}</Text>
             <Text style={styles.modalText}>Marked By: {selectedDetail?.marked_by ?? '-'}</Text>
             <Text style={styles.modalText}>Remark: {selectedDetail?.remark ?? '-'}</Text>
+            {canManualOverride ? (
+              <View style={styles.overrideWrap}>
+                <Text style={styles.overrideLabel}>Admin Override (reason required)</Text>
+                <TextInput
+                  value={remark}
+                  onChangeText={setRemark}
+                  placeholder="Enter reason"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.remarkInput}
+                  multiline
+                />
+                <View style={styles.overrideActions}>
+                  <Pressable
+                    style={[
+                      styles.overrideBtn,
+                      styles.overridePresentBtn,
+                      (!remark.trim() || manualOverride?.loading) && styles.overrideBtnDisabled,
+                    ]}
+                    disabled={!remark.trim() || manualOverride?.loading}
+                    onPress={() => handleManualOverride('present')}
+                  >
+                    <Text style={styles.overrideBtnText}>
+                      {manualOverride?.loading ? 'Saving...' : 'Mark Present'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.overrideBtn,
+                      styles.overrideAbsentBtn,
+                      (!remark.trim() || manualOverride?.loading) && styles.overrideBtnDisabled,
+                    ]}
+                    disabled={!remark.trim() || manualOverride?.loading}
+                    onPress={() => handleManualOverride('absent')}
+                  >
+                    <Text style={styles.overrideBtnText}>
+                      {manualOverride?.loading ? 'Saving...' : 'Mark Absent'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
             <Pressable style={styles.modalClose} onPress={() => setSelectedDate(null)}>
               <Text style={styles.modalCloseText}>Close</Text>
             </Pressable>
@@ -348,6 +409,52 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginBottom: 4,
     fontSize: 14,
+  },
+  overrideWrap: {
+    marginTop: Spacing.sm,
+  },
+  overrideLabel: {
+    fontFamily: Typography.medium,
+    color: Colors.text,
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  remarkInput: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#FAFAF8',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: Colors.text,
+    fontFamily: Typography.body,
+    fontSize: 13,
+  },
+  overrideActions: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  overrideBtn: {
+    flex: 1,
+    borderRadius: 999,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  overridePresentBtn: {
+    backgroundColor: Colors.primary,
+  },
+  overrideAbsentBtn: {
+    backgroundColor: Colors.error,
+  },
+  overrideBtnDisabled: {
+    opacity: 0.55,
+  },
+  overrideBtnText: {
+    color: Colors.white,
+    fontFamily: Typography.heading,
+    fontSize: 12,
   },
   modalClose: {
     marginTop: Spacing.sm,

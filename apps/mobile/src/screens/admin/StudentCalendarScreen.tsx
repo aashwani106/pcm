@@ -3,11 +3,13 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AttendanceCalendarCard } from '../../components/calendar/AttendanceCalendarCard';
+import { FeedbackPopup, FeedbackType } from '../../../components/feedback-popup';
 import { BorderRadius, Colors, Spacing, Typography } from '../../../constants/theme';
 import {
   AdminStudentAttendanceCalendarData,
   getAdminStudentAttendanceCalendar,
   getReadableErrorMessage,
+  markAdminManualAttendance,
 } from '../../../services/backend';
 import { supabase } from '../../../services/supabase';
 import { toYearMonth } from '../../utils/calendar';
@@ -24,6 +26,22 @@ export default function AdminStudentCalendarScreen() {
   const [state, setState] = useState<ScreenState>('loading');
   const [message, setMessage] = useState('Loading calendar...');
   const [refreshing, setRefreshing] = useState(false);
+  const [isSavingOverride, setIsSavingOverride] = useState(false);
+  const [popup, setPopup] = useState<{
+    visible: boolean;
+    type: FeedbackType;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
+
+  function showPopup(type: FeedbackType, title: string, msg: string) {
+    setPopup({ visible: true, type, title, message: msg });
+  }
 
   const fetchCalendar = useCallback(
     async (isRefresh = false) => {
@@ -74,8 +92,43 @@ export default function AdminStudentCalendarScreen() {
 
   const batch = data?.student.batch ?? '-';
 
+  async function handleManualOverride(input: {
+    date: string;
+    status: 'present' | 'absent';
+    remark: string;
+  }) {
+    try {
+      setIsSavingOverride(true);
+      const { data: authData, error } = await supabase.auth.getSession();
+      if (error || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      await markAdminManualAttendance(authData.session.access_token, {
+        student_id: studentId,
+        date: input.date,
+        status: input.status,
+        remark: input.remark,
+      });
+
+      showPopup('success', 'Attendance Updated', `Marked ${input.status} on ${input.date}.`);
+      await fetchCalendar(true);
+    } catch (error: unknown) {
+      showPopup('error', 'Update Failed', getReadableErrorMessage(error, 'Failed to update attendance.'));
+    } finally {
+      setIsSavingOverride(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <FeedbackPopup
+        visible={popup.visible}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+        onClose={() => setPopup((prev) => ({ ...prev, visible: false }))}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
@@ -103,6 +156,7 @@ export default function AdminStudentCalendarScreen() {
           state={state}
           message={message}
           showLegend
+          manualOverride={{ loading: isSavingOverride, onSubmit: handleManualOverride }}
         />
       </ScrollView>
     </SafeAreaView>

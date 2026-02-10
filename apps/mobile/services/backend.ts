@@ -113,6 +113,21 @@ export interface AdminManualAttendanceResult {
   attendance_id: string | null;
 }
 
+export interface AdminCreateUserInput {
+  email: string;
+  role: 'student' | 'parent';
+  batch?: string;
+  parent_id?: string;
+}
+
+export interface AdminCreateUserResult {
+  user_id: string;
+  email: string;
+  role: 'student' | 'parent';
+  temporary_password: string;
+  student_id: string | null;
+}
+
 export class ApiRequestError extends Error {
   public readonly status: number;
   public readonly details: unknown;
@@ -326,6 +341,35 @@ export async function markParentNotificationRead(
   });
 
   return parseApiResponse<{ id: string; is_read: boolean }>(res);
+}
+
+export async function adminCreateManagedUser(
+  accessToken: string,
+  input: AdminCreateUserInput
+): Promise<ApiResponse<AdminCreateUserResult>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/api/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseApiResponse<AdminCreateUserResult>(res);
+}
+
+export async function completeMyPasswordChange(
+  accessToken: string
+): Promise<ApiResponse<{ user_id: string; role: string; must_change_password: boolean }>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/api/users/me/complete-password-change`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<{ user_id: string; role: string; must_change_password: boolean }>(res);
 }
 
 export { getReadableErrorMessage };

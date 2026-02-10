@@ -1,8 +1,9 @@
-import { Slot, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
+import { Redirect, Slot, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import SplashScreenView from './splash';
 import * as SplashScreen from 'expo-splash-screen';
+import { getMyProfile, MyProfile } from '../services/profile';
 import {
   useFonts,
   Fredoka_400Regular,
@@ -17,11 +18,19 @@ import {
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
+function getRoleHomePath(role: MyProfile['role'] | undefined) {
+  if (role === 'admin') return '/(admin)';
+  if (role === 'student') return '/(student)';
+  if (role === 'parent') return '/(parent)';
+  return '/login';
+}
+
 export default function RootLayout() {
   const { session, loading: authLoading } = useAuth();
   const segments = useSegments();
-  const router = useRouter();
   const [isSplashTimerDone, setIsSplashTimerDone] = useState(false);
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Fredoka_400Regular,
@@ -46,18 +55,27 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  // Phase 2: Auth Guard
   useEffect(() => {
-    if (authLoading || !isSplashTimerDone || !fontsLoaded) return;
+    const loadProfile = async () => {
+      if (!session?.user?.id) {
+        setProfile(null);
+        setProfileLoading(false);
+        return;
+      }
 
-    const inAuthGroup = segments[0] === '(auth)';
+      setProfileLoading(true);
+      try {
+        const currentProfile = await getMyProfile(session.user.id);
+        setProfile(currentProfile);
+      } catch {
+        setProfile(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
 
-    if (!session && !inAuthGroup) {
-      router.replace('/login');
-    } else if (session && inAuthGroup) {
-      router.replace('/');
-    }
-  }, [session, authLoading, segments, isSplashTimerDone, fontsLoaded]);
+    loadProfile();
+  }, [session?.user?.id]);
 
   // If splash isn't done or fonts aren't loaded, show the custom animation
   if (!isSplashTimerDone || !fontsLoaded) {
@@ -65,7 +83,28 @@ export default function RootLayout() {
   }
 
   // Final check before showing content
-  if (authLoading) return null;
+  if (authLoading || profileLoading) return null;
+
+  const inAuthGroup = segments[0] === '(auth)';
+  const inForceGroup = segments[0] === '(force)';
+
+  if (!session) {
+    if (!inAuthGroup) {
+      return <Redirect href="/login" />;
+    }
+    return <Slot />;
+  }
+
+  if (profile?.must_change_password) {
+    if (!inForceGroup) {
+      return <Redirect href="/change-password" />;
+    }
+    return <Slot />;
+  }
+
+  if (inForceGroup || inAuthGroup) {
+    return <Redirect href={getRoleHomePath(profile?.role)} />;
+  }
 
   return <Slot />;
 }

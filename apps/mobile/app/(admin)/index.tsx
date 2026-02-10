@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import { SummaryCard } from '../../components/admin/summary-card';
 import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  adminCreateManagedUser,
   AdminAttendanceResponseData,
   getAdminAttendance,
   getReadableErrorMessage,
@@ -48,11 +50,12 @@ function formatHeaderDate(dateISO: string) {
   });
 }
 
-function HeaderSection({ date }: { date: string }) {
+function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <View style={styles.header}>
-      <Text style={styles.title}>Attendance</Text>
-      <Text style={styles.subtitle}>Overview for {formatHeaderDate(date)}</Text>
+    <View style={styles.sectionCard}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      <View style={styles.sectionBody}>{children}</View>
     </View>
   );
 }
@@ -69,16 +72,16 @@ function DateSelector({
   onToday: () => void;
 }) {
   return (
-    <View style={styles.dateCard}>
-      <Pressable style={styles.dateNavButton} onPress={onPrevious}>
-        <Text style={styles.dateNavLabel}>Prev</Text>
+    <View style={styles.dateBar}>
+      <Pressable style={styles.datePill} onPress={onPrevious}>
+        <Text style={styles.datePillText}>Prev</Text>
       </Pressable>
       <Text style={styles.dateValue}>{date}</Text>
-      <Pressable style={styles.dateNavButton} onPress={onNext}>
-        <Text style={styles.dateNavLabel}>Next</Text>
+      <Pressable style={styles.datePill} onPress={onNext}>
+        <Text style={styles.datePillText}>Next</Text>
       </Pressable>
-      <Pressable style={styles.todayButton} onPress={onToday}>
-        <Text style={styles.todayLabel}>Today</Text>
+      <Pressable style={styles.todayPill} onPress={onToday}>
+        <Text style={styles.todayPillText}>Today</Text>
       </Pressable>
     </View>
   );
@@ -103,6 +106,12 @@ export default function AdminDashboardScreen() {
   const [message, setMessage] = useState('Loading attendance...');
   const [refreshing, setRefreshing] = useState(false);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createEmail, setCreateEmail] = useState('');
+  const [createRole, setCreateRole] = useState<'student' | 'parent'>('student');
+  const [createParentId, setCreateParentId] = useState('');
+  const [createBatch, setCreateBatch] = useState('');
+  const [lastCreatedParentId, setLastCreatedParentId] = useState('');
   const [popup, setPopup] = useState<{
     visible: boolean;
     type: FeedbackType;
@@ -121,9 +130,7 @@ export default function AdminDashboardScreen() {
 
   const fetchAttendance = useCallback(
     async (date: string, isRefresh = false) => {
-      if (!session) {
-        return;
-      }
+      if (!session) return;
 
       if (isRefresh) {
         setRefreshing(true);
@@ -140,9 +147,7 @@ export default function AdminDashboardScreen() {
 
         const response = await getAdminAttendance(authData.session.access_token, date);
         const payload = response.data;
-        if (!payload) {
-          throw new Error('No attendance data received');
-        }
+        if (!payload) throw new Error('No attendance data received');
 
         setData(payload);
         if (payload.records.length === 0) {
@@ -162,18 +167,14 @@ export default function AdminDashboardScreen() {
   );
 
   useEffect(() => {
-    if (authLoading || !session) {
-      return;
-    }
+    if (authLoading || !session) return;
     fetchAttendance(selectedDate);
   }, [authLoading, fetchAttendance, selectedDate, session]);
 
   const records = useMemo(() => data?.records ?? [], [data?.records]);
 
   async function handleSendAbsentNotifications() {
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     try {
       setIsSendingNotifications(true);
@@ -206,6 +207,52 @@ export default function AdminDashboardScreen() {
     }
   }
 
+  async function handleCreateUser() {
+    if (!session) return;
+    if (!createEmail.trim()) {
+      showPopup('warning', 'Missing Email', 'Please enter email before creating user.');
+      return;
+    }
+    if (createRole === 'student' && !createParentId.trim()) {
+      showPopup('warning', 'Missing Parent ID', 'Student creation requires parent auth user id.');
+      return;
+    }
+
+    try {
+      setIsCreatingUser(true);
+      const { data: authData, error: authError } = await supabase.auth.getSession();
+      if (authError || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await adminCreateManagedUser(authData.session.access_token, {
+        email: createEmail.trim().toLowerCase(),
+        role: createRole,
+        parent_id: createRole === 'student' ? createParentId.trim() : undefined,
+        batch: createRole === 'student' ? createBatch.trim() || undefined : undefined,
+      });
+      const payload = response.data;
+      if (!payload) throw new Error('Failed to create user');
+
+      setCreateEmail('');
+      setCreateBatch('');
+      setCreateParentId('');
+      if (payload.role === 'parent') {
+        setLastCreatedParentId(payload.user_id);
+      }
+
+      showPopup(
+        'success',
+        'User Created',
+        `Role: ${payload.role}\nEmail: ${payload.email}\nUser ID: ${payload.user_id}\nTemp Password: ${payload.temporary_password}`
+      );
+    } catch (error: unknown) {
+      showPopup('error', 'Create User Failed', getReadableErrorMessage(error, 'Unable to create user.'));
+    } finally {
+      setIsCreatingUser(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FeedbackPopup
@@ -215,6 +262,7 @@ export default function AdminDashboardScreen() {
         message={popup.message}
         onClose={() => setPopup((prev) => ({ ...prev, visible: false }))}
       />
+
       <FlatList
         data={records}
         keyExtractor={(item) => item.student_id}
@@ -228,33 +276,117 @@ export default function AdminDashboardScreen() {
         }
         ListHeaderComponent={
           <View style={styles.topSection}>
-            <HeaderSection date={selectedDate} />
-            <View style={styles.topActions}>
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={styles.pageTitle}>Admin Dashboard</Text>
+                <Text style={styles.pageSubtitle}>{formatHeaderDate(selectedDate)}</Text>
+              </View>
               <Pressable onPress={handleLogout} style={styles.logoutButton}>
                 <Text style={styles.logoutText}>Logout</Text>
               </Pressable>
             </View>
-            <DateSelector
-              date={selectedDate}
-              onPrevious={() => setSelectedDate((d) => addDays(d, -1))}
-              onNext={() => setSelectedDate((d) => addDays(d, 1))}
-              onToday={() => setSelectedDate(toLocalISODate(new Date()))}
-            />
-            <Pressable
-              style={({ pressed }) => [
-                styles.notifyButton,
-                pressed && !isSendingNotifications && styles.notifyButtonPressed,
-                isSendingNotifications && styles.notifyButtonDisabled,
-              ]}
-              onPress={handleSendAbsentNotifications}
-              disabled={isSendingNotifications}
-            >
-              <Text style={styles.notifyButtonText}>
-                {isSendingNotifications ? 'Sending Alerts...' : 'Send Absent Alerts to Parents'}
-              </Text>
-            </Pressable>
-            {data?.summary ? <SummaryCards summary={data.summary} /> : null}
-            <Text style={styles.listTitle}>Attendance List</Text>
+
+            <SectionCard title="Attendance Overview" subtitle="Track daily attendance and notify parents">
+              <DateSelector
+                date={selectedDate}
+                onPrevious={() => setSelectedDate((d) => addDays(d, -1))}
+                onNext={() => setSelectedDate((d) => addDays(d, 1))}
+                onToday={() => setSelectedDate(toLocalISODate(new Date()))}
+              />
+              {data?.summary ? <SummaryCards summary={data.summary} /> : null}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.notifyButton,
+                  pressed && !isSendingNotifications && styles.notifyButtonPressed,
+                  isSendingNotifications && styles.notifyButtonDisabled,
+                ]}
+                onPress={handleSendAbsentNotifications}
+                disabled={isSendingNotifications}
+              >
+                <Text style={styles.notifyButtonText}>
+                  {isSendingNotifications ? 'Sending Alerts...' : 'Send Absent Alerts'}
+                </Text>
+              </Pressable>
+            </SectionCard>
+
+            <SectionCard title="User Management" subtitle="Create parent and student accounts">
+              <TextInput
+                value={createEmail}
+                onChangeText={setCreateEmail}
+                placeholder="Email"
+                placeholderTextColor={Colors.textMuted}
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <View style={styles.roleRow}>
+                <Pressable
+                  style={[styles.roleButton, createRole === 'student' && styles.roleButtonActive]}
+                  onPress={() => setCreateRole('student')}
+                >
+                  <Text style={[styles.roleButtonText, createRole === 'student' && styles.roleButtonTextActive]}>
+                    Student
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.roleButton, createRole === 'parent' && styles.roleButtonActive]}
+                  onPress={() => setCreateRole('parent')}
+                >
+                  <Text style={[styles.roleButtonText, createRole === 'parent' && styles.roleButtonTextActive]}>
+                    Parent
+                  </Text>
+                </Pressable>
+              </View>
+
+              {createRole === 'student' ? (
+                <>
+                  {lastCreatedParentId ? (
+                    <View style={styles.lastParentCard}>
+                      <Text style={styles.lastParentLabel}>Last Created Parent ID</Text>
+                      <Text selectable style={styles.lastParentValue}>{lastCreatedParentId}</Text>
+                      <Pressable style={styles.inlineAction} onPress={() => setCreateParentId(lastCreatedParentId)}>
+                        <Text style={styles.inlineActionText}>Use Parent ID</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  <TextInput
+                    value={createParentId}
+                    onChangeText={setCreateParentId}
+                    placeholder="Parent auth user id (uuid)"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TextInput
+                    value={createBatch}
+                    onChangeText={setCreateBatch}
+                    placeholder="Batch (optional)"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : null}
+
+              <Pressable
+                style={[styles.primaryButton, isCreatingUser && styles.primaryButtonDisabled]}
+                onPress={handleCreateUser}
+                disabled={isCreatingUser}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {isCreatingUser ? 'Creating...' : `Create ${createRole === 'student' ? 'Student' : 'Parent'}`}
+                </Text>
+              </Pressable>
+            </SectionCard>
+
+            <View style={styles.listHeaderRow}>
+              <Text style={styles.listTitle}>Attendance List</Text>
+              <Text style={styles.listCount}>{records.length}</Text>
+            </View>
           </View>
         }
         renderItem={({ item }) => (
@@ -303,12 +435,24 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   topSection: {
-    paddingTop: Spacing.xl,
+    paddingTop: Spacing.lg,
   },
-  topActions: {
+  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: Spacing.sm,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  pageTitle: {
+    fontFamily: Typography.heading,
+    fontSize: 30,
+    color: Colors.text,
+  },
+  pageSubtitle: {
+    marginTop: 4,
+    fontFamily: Typography.body,
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   logoutButton: {
     paddingHorizontal: 14,
@@ -323,57 +467,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textMuted,
   },
-  header: {
-    marginBottom: Spacing.md,
-  },
-  title: {
-    fontFamily: Typography.heading,
-    fontSize: 28,
-    color: Colors.text,
-  },
-  subtitle: {
-    fontFamily: Typography.body,
-    fontSize: 14,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  dateCard: {
+  sectionCard: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,
     marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontFamily: Typography.heading,
+    color: Colors.text,
+    fontSize: 17,
+  },
+  sectionSubtitle: {
+    marginTop: 2,
+    fontFamily: Typography.body,
+    color: Colors.textMuted,
+    fontSize: 12,
+  },
+  sectionBody: {
+    marginTop: Spacing.sm,
+  },
+  dateBar: {
+    backgroundColor: '#F8F7F3',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     flexWrap: 'wrap',
+    marginBottom: Spacing.sm,
   },
-  dateNavButton: {
+  datePill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  dateNavLabel: {
+  datePillText: {
     fontFamily: Typography.medium,
     color: Colors.text,
-    fontSize: 13,
+    fontSize: 12,
   },
   dateValue: {
     fontFamily: Typography.heading,
     color: Colors.text,
-    fontSize: 16,
+    fontSize: 15,
     flex: 1,
     textAlign: 'center',
   },
-  todayButton: {
+  todayPill: {
     backgroundColor: Colors.primary,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  todayLabel: {
+  todayPillText: {
     color: Colors.white,
     fontFamily: Typography.medium,
     fontSize: 12,
@@ -381,15 +535,14 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   notifyButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 26,
-    height: 52,
+    borderRadius: 999,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.md,
   },
   notifyButtonPressed: {
     opacity: 0.9,
@@ -399,14 +552,120 @@ const styles = StyleSheet.create({
   },
   notifyButtonText: {
     fontFamily: Typography.heading,
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.white,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#FAF9F5',
+    color: Colors.text,
+    fontFamily: Typography.body,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: Spacing.sm,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  roleButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 999,
+    paddingVertical: 9,
+    alignItems: 'center',
+    backgroundColor: '#F8F7F3',
+  },
+  roleButtonActive: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+  },
+  roleButtonText: {
+    fontFamily: Typography.medium,
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  roleButtonTextActive: {
+    color: Colors.primary,
+  },
+  lastParentCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F8F7F3',
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  lastParentLabel: {
+    fontFamily: Typography.medium,
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  lastParentValue: {
+    fontFamily: Typography.body,
+    color: Colors.text,
+    fontSize: 12,
+    marginBottom: Spacing.sm,
+  },
+  inlineAction: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+  },
+  inlineActionText: {
+    fontFamily: Typography.medium,
+    color: Colors.primary,
+    fontSize: 12,
+  },
+  primaryButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 999,
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
+    fontFamily: Typography.heading,
+    fontSize: 14,
+    color: Colors.white,
+  },
+  listHeaderRow: {
+    marginTop: 2,
+    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   listTitle: {
     fontFamily: Typography.heading,
     fontSize: 18,
     color: Colors.text,
-    marginBottom: Spacing.sm,
+  },
+  listCount: {
+    minWidth: 28,
+    textAlign: 'center',
+    fontFamily: Typography.heading,
+    color: Colors.primary,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.2)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 12,
   },
   stateContainer: {
     flex: 1,

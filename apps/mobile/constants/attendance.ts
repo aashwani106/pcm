@@ -11,7 +11,7 @@ export const COACHING_LATITUDE = 26.89644;
 export const COACHING_LONGITUDE = 80.92831;
 
 /** Allowed radius in meters. Student must be within this distance to mark attendance. */
-export const ATTENDANCE_RADIUS_METERS = 50;
+export const ATTENDANCE_RADIUS_METERS = 500;
 
 /**
  * Maximum allowed GPS accuracy (in meters).
@@ -24,5 +24,5 @@ export const ATTENDANCE_START_HOUR = 7;
 export const ATTENDANCE_START_MINUTE = 30;
 
 /** Attendance window: end (local time). */
-export const ATTENDANCE_END_HOUR = 18;
+export const ATTENDANCE_END_HOUR = 23;
 export const ATTENDANCE_END_MINUTE = 15;

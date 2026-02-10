@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import {
+  getAttendanceMarkState,
   getAttendancePhotoViewUrl,
   markAttendanceWithPhoto,
   reviewAttendanceByAdminOrParent,
@@ -28,6 +29,14 @@ export async function markAttendance(req: AuthenticatedRequest, res: Response) {
   return res
     .status(200)
     .json(new ApiResponse(true, data, 'Attendance marked successfully', null));
+}
+
+export async function getAttendanceState(req: AuthenticatedRequest, res: Response) {
+  const userId = req.user!.id;
+  const data = await getAttendanceMarkState(userId);
+  return res
+    .status(200)
+    .json(new ApiResponse(true, data, 'Attendance state loaded successfully', null));
 }
 
 export async function getPhotoUploadUrl(req: AuthenticatedRequest, res: Response) {

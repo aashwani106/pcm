@@ -12,3 +12,19 @@ export function isWithinTimeWindow(now = new Date()): boolean {
 
   return now >= start && now <= end;
 }
+
+export function getTimeWindowState(now = new Date()): 'not_started' | 'open' | 'closed' {
+  const start = new Date(now);
+  start.setHours(START_HOUR, START_MIN, 0, 0);
+
+  const end = new Date(now);
+  end.setHours(END_HOUR, END_MIN, 0, 0);
+
+  if (now < start) {
+    return 'not_started';
+  }
+  if (now > end) {
+    return 'closed';
+  }
+  return 'open';
+}

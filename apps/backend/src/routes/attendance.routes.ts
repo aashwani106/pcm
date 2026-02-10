@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getAttendanceState,
   getAttendancePhotoViewUrlForRecord,
   getPhotoUploadUrl,
   markAttendance,
@@ -17,6 +18,7 @@ router.post(
   requireRole('student'),
   asyncHandler(getPhotoUploadUrl)
 );
+router.get('/state', requireAuth, requireRole('student'), asyncHandler(getAttendanceState));
 router.post('/mark', requireAuth, requireRole('student'), asyncHandler(markAttendance));
 router.post('/review', requireAuth, asyncHandler(reviewAttendance));
 router.get('/:attendanceId/photo-view-url', requireAuth, asyncHandler(getAttendancePhotoViewUrlForRecord));

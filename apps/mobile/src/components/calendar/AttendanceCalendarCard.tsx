@@ -30,6 +30,7 @@ interface AttendanceCalendarCardProps {
   state: ScreenState;
   message?: string;
   showLegend?: boolean;
+  blockedReason?: string | null;
   manualOverride?: {
     loading?: boolean;
     onSubmit: (input: { date: string; status: 'present' | 'absent'; remark: string }) => Promise<void> | void;
@@ -56,6 +57,7 @@ export function AttendanceCalendarCard({
   state,
   message = 'Unable to load attendance calendar.',
   showLegend = false,
+  blockedReason = null,
   manualOverride,
   reviewActions,
 }: AttendanceCalendarCardProps) {
@@ -175,6 +177,9 @@ export function AttendanceCalendarCard({
             <Text style={styles.modalText}>Marked Time: {selectedDetail?.marked_at ?? '-'}</Text>
             <Text style={styles.modalText}>Marked By: {selectedDetail?.marked_by ?? '-'}</Text>
             <Text style={styles.modalText}>Remark: {selectedDetail?.remark ?? '-'}</Text>
+            {selectedDetail?.status === 'absent' && blockedReason ? (
+              <Text style={styles.modalText}>Reason: {blockedReason}</Text>
+            ) : null}
             {selectedDetail?.accuracy_meters != null ? (
               <Text style={styles.modalText}>
                 Accuracy: {Math.round(selectedDetail.accuracy_meters)} m
@@ -354,6 +359,7 @@ export function AttendanceCalendarCard({
                       styles.dayInner,
                       dayType === 'present' && styles.dayPresent,
                       dayType === 'absent' && styles.dayAbsent,
+                      dayType === 'absent' && blockedReason && styles.dayBlocked,
                       dayType === 'holiday' && styles.dayHoliday,
                       dayType === 'future' && styles.dayFuture,
                     ]}
@@ -482,6 +488,9 @@ const styles = StyleSheet.create({
   },
   dayAbsent: {
     backgroundColor: '#D99292',
+  },
+  dayBlocked: {
+    backgroundColor: '#B7B8BC',
   },
   dayHoliday: {
     backgroundColor: '#DFDDD8',

@@ -22,10 +22,24 @@ export interface StudentAttendanceCalendarResult {
     id: string;
     name: string;
     batch: string | null;
+    status: string | null;
+    attendance_enabled: boolean;
+    attendance_lock_reason: string | null;
   };
   month: string;
   attendance_by_date: Record<string, AttendanceDayDetail>;
   holidays: string[];
+}
+
+function getAttendanceLockReason(student: { status?: string | null; attendance_enabled?: boolean | null }) {
+  const status = (student.status ?? 'active').toString().toLowerCase();
+  if (status !== 'active') {
+    return 'Attendance paused by admin';
+  }
+  if (student.attendance_enabled === false) {
+    return 'Attendance disabled by admin';
+  }
+  return null;
 }
 
 type CalendarAttendanceRow = {
@@ -171,6 +185,9 @@ export async function getStudentAttendanceCalendar(studentId: string, month: str
       id: student.id,
       name: `Student ${student.id.slice(0, 8)}`,
       batch: student.batch ?? null,
+      status: student.status ?? null,
+      attendance_enabled: student.attendance_enabled !== false,
+      attendance_lock_reason: getAttendanceLockReason(student),
     },
     month,
     attendance_by_date: attendanceByDate,

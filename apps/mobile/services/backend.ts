@@ -15,6 +15,28 @@ export interface MarkAttendanceData {
   status: 'present';
 }
 
+export type AttendanceLockReasonCode =
+  | 'none'
+  | 'student_not_found'
+  | 'student_inactive'
+  | 'attendance_disabled'
+  | 'window_not_started'
+  | 'window_closed'
+  | 'holiday'
+  | 'already_marked';
+
+export interface AttendanceStateData {
+  date: string;
+  can_mark: boolean;
+  reason_code: AttendanceLockReasonCode;
+  reason_message: string;
+  student_id: string | null;
+  student_status: string | null;
+  attendance_enabled: boolean | null;
+  already_marked: boolean;
+  is_holiday: boolean;
+}
+
 export interface AttendancePhotoUploadUrlData {
   uploadUrl: string;
   photoUrl: string;
@@ -93,6 +115,9 @@ export interface AdminStudentAttendanceCalendarData {
     id: string;
     name: string;
     batch: string | null;
+    status: string | null;
+    attendance_enabled: boolean;
+    attendance_lock_reason: string | null;
   };
   month: string;
   attendance_by_date: Record<string, AdminAttendanceCalendarDay>;
@@ -267,6 +292,19 @@ export async function getAttendancePhotoUploadUrl(
   });
 
   return parseApiResponse<AttendancePhotoUploadUrlData>(res);
+}
+
+export async function getAttendanceState(
+  accessToken: string
+): Promise<ApiResponse<AttendanceStateData>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/attendance/state`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<AttendanceStateData>(res);
 }
 
 export async function markAttendance(

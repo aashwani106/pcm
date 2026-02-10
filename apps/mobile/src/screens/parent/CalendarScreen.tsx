@@ -109,6 +109,7 @@ export default function ParentCalendarScreen() {
           onMonthChange={setMonth}
           attendanceByDate={data?.calendar.attendance_by_date ?? {}}
           holidays={data?.calendar.holidays ?? []}
+          blockedReason={data?.calendar.student.attendance_lock_reason ?? null}
           state={state}
           message={message}
           reviewActions={{

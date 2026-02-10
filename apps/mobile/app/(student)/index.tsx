@@ -17,7 +17,6 @@ import { useAttendanceChecks } from '../../hooks/useAttendanceChecks';
 import { getDistanceAndInside } from '../../utils/distance';
 import { supabase } from '../../services/supabase';
 import { getAttendancePhotoUploadUrl, getReadableErrorMessage, markAttendance } from '../../services/backend';
-import { isWithinTimeWindow, getTimeWindowStatus } from '../../utils/timeWindow';
 import { FeedbackPopup, FeedbackType } from '../../components/feedback-popup';
 import {
   COACHING_LATITUDE,
@@ -42,14 +41,38 @@ export type AttendanceStatus =
   | 'outside'
   | 'not_started'
   | 'closed'
+  | 'student_inactive'
+  | 'attendance_disabled'
+  | 'student_not_found'
   | 'open';
 
-function getStatusDisplay(type: AttendanceStatus): { label: string; subtext: string; color: string } {
+function getStatusDisplay(
+  type: AttendanceStatus,
+  backendReasonMessage?: string
+): { label: string; subtext: string; color: string } {
   switch (type) {
     case 'holiday':
       return { label: 'Holiday', subtext: 'No attendance today.', color: Colors.textMuted };
     case 'already_marked':
       return { label: 'Already marked', subtext: 'Attendance already recorded for today.', color: Colors.textMuted };
+    case 'student_not_found':
+      return {
+        label: 'Account not linked',
+        subtext: backendReasonMessage ?? 'Student record not found. Contact admin.',
+        color: Colors.textMuted,
+      };
+    case 'student_inactive':
+      return {
+        label: 'Attendance paused',
+        subtext: backendReasonMessage ?? 'Attendance is disabled by admin.',
+        color: Colors.textMuted,
+      };
+    case 'attendance_disabled':
+      return {
+        label: 'Attendance disabled',
+        subtext: backendReasonMessage ?? 'Attendance is temporarily disabled by admin.',
+        color: Colors.textMuted,
+      };
     case 'no_location':
       return { label: 'Location not ready', subtext: 'Permission or GPS not available. Allow location and try Refresh.', color: Colors.textMuted };
     case 'accuracy_poor':
@@ -70,18 +93,23 @@ function getStatusDisplay(type: AttendanceStatus): { label: string; subtext: str
 
 function resolveAttendanceStatus(
   checksLoading: boolean,
-  isHoliday: boolean,
-  alreadyMarked: boolean,
+  reasonCode: string,
+  canMarkFromBackend: boolean,
   hasLocation: boolean,
   isAccuracyAcceptable: boolean,
   isInsidePremises: boolean
 ): AttendanceStatus {
   if (checksLoading) return 'loading';
-  if (isHoliday) return 'holiday';
-  if (alreadyMarked) return 'already_marked';
+  if (reasonCode === 'student_not_found') return 'student_not_found';
+  if (reasonCode === 'student_inactive') return 'student_inactive';
+  if (reasonCode === 'attendance_disabled') return 'attendance_disabled';
+  if (reasonCode === 'window_not_started') return 'not_started';
+  if (reasonCode === 'window_closed') return 'closed';
+  if (reasonCode === 'holiday') return 'holiday';
+  if (reasonCode === 'already_marked') return 'already_marked';
+  if (!canMarkFromBackend) return 'closed';
   if (!hasLocation) return 'no_location';
   if (!isAccuracyAcceptable) return 'accuracy_poor';
-  if (!isWithinTimeWindow()) return getTimeWindowStatus();
   if (!isInsidePremises) return 'outside';
   return 'open';
 }
@@ -131,9 +159,13 @@ export default function StudentAttendanceScreen() {
     isLoading: locationLoading,
     refresh: refreshLocation,
   } = useAttendanceLocation();
-  const { isHoliday, alreadyMarked, loading: checksLoading, refresh: refreshChecks } = useAttendanceChecks(
-    session?.user?.id
-  );
+  const {
+    loading: checksLoading,
+    canMark: canMarkFromBackend,
+    reasonCode,
+    reasonMessage,
+    refresh: refreshChecks,
+  } = useAttendanceChecks(session?.access_token);
 
   const hasLocation = currentLatitude != null && currentLongitude != null;
   const distanceResult = hasLocation
@@ -149,13 +181,13 @@ export default function StudentAttendanceScreen() {
 
   const status = resolveAttendanceStatus(
     checksLoading,
-    isHoliday,
-    alreadyMarked || localMarked,
+    localMarked ? 'already_marked' : reasonCode,
+    localMarked ? false : canMarkFromBackend,
     hasLocation,
     isAccuracyAcceptable,
     isInsidePremises
   );
-  const statusDisplay = getStatusDisplay(status);
+  const statusDisplay = getStatusDisplay(status, reasonMessage);
   const busy = flowState === 'capturing_photo' || flowState === 'uploading_photo' || flowState === 'marking_attendance';
   const canMarkAttendance = status === 'open' && !busy;
 

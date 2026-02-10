@@ -15,12 +15,34 @@ import {
 import { supabaseAdmin } from '../config/supabase';
 import { ApiError } from '../utils/ApiError';
 import { getTodayLocalISODate } from '../utils/date';
-import { isWithinTimeWindow } from '../utils/timeWindow';
+import { getTimeWindowState, isWithinTimeWindow } from '../utils/timeWindow';
 import {
   assertPhotoPathBelongsToStudent,
   getAttendancePhotoSignedViewUrl,
 } from './storage.service';
 import { findProfileRoleById } from '../models/profile.model';
+
+export type AttendanceLockReasonCode =
+  | 'none'
+  | 'student_not_found'
+  | 'student_inactive'
+  | 'attendance_disabled'
+  | 'window_not_started'
+  | 'window_closed'
+  | 'holiday'
+  | 'already_marked';
+
+export interface AttendanceMarkState {
+  date: string;
+  can_mark: boolean;
+  reason_code: AttendanceLockReasonCode;
+  reason_message: string;
+  student_id: string | null;
+  student_status: string | null;
+  attendance_enabled: boolean | null;
+  already_marked: boolean;
+  is_holiday: boolean;
+}
 
 function extractParentId(studentsRelation: unknown): string | null {
   if (Array.isArray(studentsRelation)) {
@@ -36,11 +58,15 @@ function extractParentId(studentsRelation: unknown): string | null {
 function assertStudentAttendanceState(student: StudentRow) {
   const status = (student.status ?? 'active').toString().toLowerCase();
   if (status !== 'active') {
-    throw new ApiError(403, 'Attendance is disabled for this student');
+    throw new ApiError(403, 'Attendance is disabled by admin', {
+      code: 'student_inactive',
+    });
   }
 
   if (student.attendance_enabled === false) {
-    throw new ApiError(403, 'Attendance is temporarily disabled');
+    throw new ApiError(403, 'Attendance is temporarily disabled by admin', {
+      code: 'attendance_disabled',
+    });
   }
 }
 
@@ -68,12 +94,116 @@ export async function resolveStudentIdForUser(userId: string) {
   return student.id;
 }
 
+function getReasonMessage(code: AttendanceLockReasonCode) {
+  switch (code) {
+    case 'student_not_found':
+      return 'Student record not found. Contact admin.';
+    case 'student_inactive':
+      return 'Attendance is disabled by admin';
+    case 'attendance_disabled':
+      return 'Attendance is temporarily disabled by admin';
+    case 'window_not_started':
+      return 'Attendance window has not started yet';
+    case 'window_closed':
+      return 'Attendance window has closed for today';
+    case 'holiday':
+      return 'Attendance is blocked on holiday';
+    case 'already_marked':
+      return 'Attendance already marked for today';
+    case 'none':
+    default:
+      return 'Attendance can be marked now';
+  }
+}
+
+export async function getAttendanceMarkState(userId: string): Promise<AttendanceMarkState> {
+  const today = getTodayLocalISODate();
+  const { data, error } = await listStudentsByUserId(userId);
+  if (error) {
+    throw new ApiError(500, 'Failed to load student account', error);
+  }
+
+  const rows = (data ?? []) as StudentRow[];
+  if (rows.length === 0) {
+    return {
+      date: today,
+      can_mark: false,
+      reason_code: 'student_not_found',
+      reason_message: getReasonMessage('student_not_found'),
+      student_id: null,
+      student_status: null,
+      attendance_enabled: null,
+      already_marked: false,
+      is_holiday: false,
+    };
+  }
+  if (rows.length > 1) {
+    throw new ApiError(409, 'Student mapping is invalid. Contact admin.');
+  }
+
+  const student = rows[0];
+  const studentStatus = (student.status ?? 'active').toString().toLowerCase();
+  const attendanceEnabled = student.attendance_enabled !== false;
+
+  let reasonCode: AttendanceLockReasonCode = 'none';
+
+  if (studentStatus !== 'active') {
+    reasonCode = 'student_inactive';
+  } else if (!attendanceEnabled) {
+    reasonCode = 'attendance_disabled';
+  } else {
+    const timeWindow = getTimeWindowState();
+    if (timeWindow === 'not_started') {
+      reasonCode = 'window_not_started';
+    } else if (timeWindow === 'closed') {
+      reasonCode = 'window_closed';
+    }
+  }
+
+  const { data: holiday, error: holidayError } = await findHolidayByDate(today);
+  if (holidayError) {
+    throw new ApiError(500, 'Failed to verify holiday', holidayError);
+  }
+  if (reasonCode === 'none' && holiday) {
+    reasonCode = 'holiday';
+  }
+
+  let alreadyMarked = false;
+  if (reasonCode === 'none') {
+    const { data: existing, error: existingError } = await findAttendanceByStudentAndDate(
+      student.id,
+      today
+    );
+    if (existingError) {
+      throw new ApiError(500, 'Failed to verify attendance', existingError);
+    }
+    alreadyMarked = Boolean(existing);
+    if (alreadyMarked) {
+      reasonCode = 'already_marked';
+    }
+  }
+
+  return {
+    date: today,
+    can_mark: reasonCode === 'none',
+    reason_code: reasonCode,
+    reason_message: getReasonMessage(reasonCode),
+    student_id: student.id,
+    student_status: studentStatus,
+    attendance_enabled: attendanceEnabled,
+    already_marked: alreadyMarked,
+    is_holiday: Boolean(holiday),
+  };
+}
+
 export async function markAttendanceForStudent(userId: string) {
   const student = await resolveStudentForAttendance(userId);
   const studentId = student.id;
 
   if (!isWithinTimeWindow()) {
-    throw new ApiError(400, 'Attendance window closed');
+    throw new ApiError(400, 'Attendance window closed', {
+      code: 'window_closed',
+    });
   }
 
   const today = getTodayLocalISODate();
@@ -83,7 +213,9 @@ export async function markAttendanceForStudent(userId: string) {
     throw new ApiError(500, 'Failed to verify holiday', holidayError);
   }
   if (holiday) {
-    throw new ApiError(400, 'Attendance is blocked on holiday');
+    throw new ApiError(400, 'Attendance is blocked on holiday', {
+      code: 'holiday',
+    });
   }
 
   const { data: existing, error: existingError } = await findAttendanceByStudentAndDate(studentId, today);
@@ -91,7 +223,9 @@ export async function markAttendanceForStudent(userId: string) {
     throw new ApiError(500, 'Failed to verify attendance', existingError);
   }
   if (existing) {
-    throw new ApiError(409, 'Attendance already marked');
+    throw new ApiError(409, 'Attendance already marked', {
+      code: 'already_marked',
+    });
   }
 
   const { error: insertError } = await insertAttendance({
@@ -124,7 +258,9 @@ export async function markAttendanceWithPhoto(params: {
   const studentId = student.id;
 
   if (!isWithinTimeWindow()) {
-    throw new ApiError(400, 'Attendance window closed');
+    throw new ApiError(400, 'Attendance window closed', {
+      code: 'window_closed',
+    });
   }
 
   const today = getTodayLocalISODate();
@@ -136,7 +272,9 @@ export async function markAttendanceWithPhoto(params: {
     throw new ApiError(500, 'Failed to verify holiday', holidayError);
   }
   if (holiday) {
-    throw new ApiError(400, 'Attendance is blocked on holiday');
+    throw new ApiError(400, 'Attendance is blocked on holiday', {
+      code: 'holiday',
+    });
   }
 
   const { data: existing, error: existingError } = await findAttendanceByStudentAndDate(studentId, today);
@@ -144,7 +282,9 @@ export async function markAttendanceWithPhoto(params: {
     throw new ApiError(500, 'Failed to verify attendance', existingError);
   }
   if (existing) {
-    throw new ApiError(409, 'Attendance already marked');
+    throw new ApiError(409, 'Attendance already marked', {
+      code: 'already_marked',
+    });
   }
 
   const markedAt = new Date().toISOString();

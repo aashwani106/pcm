@@ -67,6 +67,7 @@ export default function StudentCalendarScreen() {
           onMonthChange={setMonth}
           attendanceByDate={data?.attendance_by_date ?? {}}
           holidays={data?.holidays ?? []}
+          blockedReason={data?.student.attendance_lock_reason ?? null}
           state={state}
           message={message}
         />

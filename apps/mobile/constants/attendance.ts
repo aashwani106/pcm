@@ -20,8 +20,8 @@ export const ATTENDANCE_RADIUS_METERS = 500;
 export const MAX_LOCATION_ACCURACY_METERS = 100;
 
 /** Attendance window: start (local time). */
-export const ATTENDANCE_START_HOUR = 7;
-export const ATTENDANCE_START_MINUTE = 30;
+export const ATTENDANCE_START_HOUR = 0;
+export const ATTENDANCE_START_MINUTE = 3;
 
 /** Attendance window: end (local time). */
 export const ATTENDANCE_END_HOUR = 23;

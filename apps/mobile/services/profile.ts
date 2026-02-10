@@ -6,24 +6,43 @@ export interface MyProfile {
     must_change_password: boolean;
 }
 
-export async function getUserRole(userId: string) {
-    const { data, error } = await supabase
+async function findProfileById(userId: string) {
+    return supabase
         .from('profiles')
-        .select('role')
+        .select('id, role, must_change_password, email')
         .eq('id', userId)
-        .single();
-
-    if (error) throw error;
-    return data.role;
+        .maybeSingle();
 }
 
-export async function getMyProfile(userId: string): Promise<MyProfile> {
-    const { data, error } = await supabase
+async function findProfileByEmail(email: string) {
+    return supabase
         .from('profiles')
-        .select('id, role, must_change_password')
-        .eq('id', userId)
-        .single();
+        .select('id, role, must_change_password, email')
+        .eq('email', email)
+        .maybeSingle();
+}
 
-    if (error) throw error;
-    return data as MyProfile;
+export async function getMyProfile(userId: string, email?: string | null): Promise<MyProfile> {
+    const byId = await findProfileById(userId);
+    if (byId.error) throw byId.error;
+    if (byId.data) {
+        return byId.data as MyProfile;
+    }
+
+    if (!email) {
+        throw new Error('Profile not found for current user');
+    }
+
+    const byEmail = await findProfileByEmail(email);
+    if (byEmail.error) throw byEmail.error;
+    if (!byEmail.data) {
+        throw new Error('Profile not found for current user');
+    }
+
+    return byEmail.data as MyProfile;
+}
+
+export async function getUserRole(userId: string, email?: string | null) {
+    const profile = await getMyProfile(userId, email);
+    return profile.role;
 }

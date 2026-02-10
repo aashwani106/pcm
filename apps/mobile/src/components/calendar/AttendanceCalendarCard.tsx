@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -33,6 +34,16 @@ interface AttendanceCalendarCardProps {
     loading?: boolean;
     onSubmit: (input: { date: string; status: 'present' | 'absent'; remark: string }) => Promise<void> | void;
   };
+  reviewActions?: {
+    loading?: boolean;
+    canReview?: boolean;
+    onReviewSubmit: (input: {
+      attendanceId: string;
+      status: 'accepted' | 'flagged';
+      note?: string;
+    }) => Promise<void> | void;
+    onLoadPhotoUrl?: (attendanceId: string) => Promise<string | null>;
+  };
 }
 
 const WEEK_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -46,9 +57,13 @@ export function AttendanceCalendarCard({
   message = 'Unable to load attendance calendar.',
   showLegend = false,
   manualOverride,
+  reviewActions,
 }: AttendanceCalendarCardProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [remark, setRemark] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
+  const [photoViewUrl, setPhotoViewUrl] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
   const holidaysSet = useMemo(() => new Set(holidays), [holidays]);
   const cells = useMemo(() => buildMonthGrid(month), [month]);
   const todayISO = toLocalISODate(new Date());
@@ -58,20 +73,71 @@ export function AttendanceCalendarCard({
     const dayType = getCellType(selectedDate, holidaysSet, attendanceByDate, todayISO);
     const row = attendanceByDate[selectedDate];
     if (dayType === 'future' || dayType === 'holiday') {
-      return { date: selectedDate, status: dayType, marked_at: '-', marked_by: '-', remark: '-' };
+      return {
+        date: selectedDate,
+        attendance_id: null,
+        status: dayType,
+        marked_at: '-',
+        marked_by: '-',
+        remark: '-',
+        photo_url: null,
+        accuracy_meters: null,
+        review_status: null,
+        review_note: null,
+        reviewed_at: null,
+        reviewed_by_role: null,
+      };
     }
     return {
       date: selectedDate,
+      attendance_id: row?.attendance_id ?? null,
       status: row?.status ?? 'absent',
       marked_at: formatMarkedTime(row?.marked_at ?? null),
       marked_by: row?.marked_by ?? '-',
       remark: row?.remark ?? '-',
+      photo_url: row?.photo_url ?? null,
+      accuracy_meters: row?.accuracy_meters ?? null,
+      review_status: row?.review_status ?? null,
+      review_note: row?.review_note ?? null,
+      reviewed_at: row?.reviewed_at ?? null,
+      reviewed_by_role: row?.reviewed_by_role ?? null,
     };
   }, [attendanceByDate, holidaysSet, selectedDate, todayISO]);
 
   const canManualOverride = Boolean(
     manualOverride && selectedDetail && selectedDetail.status !== 'future' && selectedDetail.status !== 'holiday'
   );
+  const canReview = Boolean(
+    reviewActions?.canReview &&
+      selectedDetail &&
+      selectedDetail.status !== 'future' &&
+      selectedDetail.status !== 'holiday' &&
+      selectedDetail.attendance_id
+  );
+
+  useEffect(() => {
+    setRemark('');
+    setReviewNote('');
+    setPhotoViewUrl(null);
+
+    if (selectedDetail?.attendance_id && selectedDetail?.photo_url) {
+      loadPhotoViewUrl(selectedDetail.attendance_id);
+    }
+  }, [selectedDetail?.attendance_id, selectedDetail?.photo_url]);
+
+  async function loadPhotoViewUrl(attendanceId: string) {
+    if (!reviewActions?.onLoadPhotoUrl) {
+      setPhotoViewUrl(null);
+      return;
+    }
+    try {
+      setPhotoLoading(true);
+      const url = await reviewActions.onLoadPhotoUrl(attendanceId);
+      setPhotoViewUrl(url);
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
 
   async function handleManualOverride(status: 'present' | 'absent') {
     if (!manualOverride || !selectedDetail) return;
@@ -80,6 +146,17 @@ export function AttendanceCalendarCard({
     await manualOverride.onSubmit({ date: selectedDetail.date, status, remark: trimmedRemark });
     setSelectedDate(null);
     setRemark('');
+  }
+
+  async function handleReview(status: 'accepted' | 'flagged') {
+    if (!canReview || !selectedDetail?.attendance_id || !reviewActions) return;
+    await reviewActions.onReviewSubmit({
+      attendanceId: selectedDetail.attendance_id,
+      status,
+      note: reviewNote.trim() ? reviewNote.trim() : undefined,
+    });
+    setSelectedDate(null);
+    setReviewNote('');
   }
 
   return (
@@ -98,6 +175,70 @@ export function AttendanceCalendarCard({
             <Text style={styles.modalText}>Marked Time: {selectedDetail?.marked_at ?? '-'}</Text>
             <Text style={styles.modalText}>Marked By: {selectedDetail?.marked_by ?? '-'}</Text>
             <Text style={styles.modalText}>Remark: {selectedDetail?.remark ?? '-'}</Text>
+            {selectedDetail?.accuracy_meters != null ? (
+              <Text style={styles.modalText}>
+                Accuracy: {Math.round(selectedDetail.accuracy_meters)} m
+              </Text>
+            ) : null}
+            <Text style={styles.modalText}>
+              Review: {selectedDetail?.review_status ?? 'accepted'}
+            </Text>
+            <Text style={styles.modalText}>
+              Review Note: {selectedDetail?.review_note ?? '-'}
+            </Text>
+            {photoLoading ? (
+              <View style={styles.photoLoadingWrap}>
+                <ActivityIndicator color={Colors.primary} />
+                <Text style={styles.photoLoadingText}>Loading photo...</Text>
+              </View>
+            ) : photoViewUrl ? (
+              <Image source={{ uri: photoViewUrl }} style={styles.reviewPhoto} resizeMode="cover" />
+            ) : selectedDetail?.photo_url ? (
+              <Text style={styles.modalMuted}>Photo unavailable</Text>
+            ) : (
+              <Text style={styles.modalMuted}>No photo for this attendance record</Text>
+            )}
+            {canReview ? (
+              <View style={styles.overrideWrap}>
+                <Text style={styles.overrideLabel}>Review attendance</Text>
+                <TextInput
+                  value={reviewNote}
+                  onChangeText={setReviewNote}
+                  placeholder="Add optional review note"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.remarkInput}
+                  multiline
+                />
+                <View style={styles.overrideActions}>
+                  <Pressable
+                    style={[
+                      styles.overrideBtn,
+                      styles.overridePresentBtn,
+                      reviewActions?.loading && styles.overrideBtnDisabled,
+                    ]}
+                    disabled={Boolean(reviewActions?.loading)}
+                    onPress={() => handleReview('accepted')}
+                  >
+                    <Text style={styles.overrideBtnText}>
+                      {reviewActions?.loading ? 'Saving...' : 'Accept'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.overrideBtn,
+                      styles.overrideAbsentBtn,
+                      reviewActions?.loading && styles.overrideBtnDisabled,
+                    ]}
+                    disabled={Boolean(reviewActions?.loading)}
+                    onPress={() => handleReview('flagged')}
+                  >
+                    <Text style={styles.overrideBtnText}>
+                      {reviewActions?.loading ? 'Saving...' : 'Flag'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
             {canManualOverride ? (
               <View style={styles.overrideWrap}>
                 <Text style={styles.overrideLabel}>Admin Override (reason required)</Text>
@@ -409,6 +550,32 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginBottom: 4,
     fontSize: 14,
+  },
+  modalMuted: {
+    marginTop: 2,
+    fontFamily: Typography.body,
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  photoLoadingWrap: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  photoLoadingText: {
+    fontFamily: Typography.medium,
+    color: Colors.textMuted,
+    fontSize: 12,
+  },
+  reviewPhoto: {
+    marginTop: Spacing.sm,
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#efebe3',
   },
   overrideWrap: {
     marginTop: Spacing.sm,

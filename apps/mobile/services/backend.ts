@@ -9,9 +9,15 @@ export interface ApiResponse<T> {
 }
 
 export interface MarkAttendanceData {
+  attendanceId: string;
   studentId: string;
   date: string;
   status: 'present';
+}
+
+export interface AttendancePhotoUploadUrlData {
+  uploadUrl: string;
+  photoUrl: string;
 }
 
 export interface AdminAttendanceRecord {
@@ -69,10 +75,17 @@ export interface AdminStudentAttendanceHistoryData {
 }
 
 export interface AdminAttendanceCalendarDay {
+  attendance_id: string;
   status: 'present' | 'absent';
   marked_at: string | null;
   marked_by: 'student' | 'admin' | null;
   remark: string | null;
+  photo_url: string | null;
+  accuracy_meters: number | null;
+  review_status: 'accepted' | 'flagged' | null;
+  review_note: string | null;
+  reviewed_at: string | null;
+  reviewed_by_role: 'admin' | 'parent' | null;
 }
 
 export interface AdminStudentAttendanceCalendarData {
@@ -113,6 +126,25 @@ export interface AdminManualAttendanceResult {
   attendance_id: string | null;
 }
 
+export interface AttendanceReviewInput {
+  attendance_id: string;
+  review_status: 'accepted' | 'flagged';
+  review_note?: string;
+}
+
+export interface AttendanceReviewResult {
+  attendance_id: string;
+  review_status: 'accepted' | 'flagged';
+  review_note: string | null;
+  reviewed_at: string | null;
+  reviewed_by_role: 'admin' | 'parent' | null;
+}
+
+export interface AttendancePhotoViewUrlResult {
+  attendance_id: string;
+  view_url: string | null;
+}
+
 export interface AdminCreateUserInput {
   email: string;
   role: 'student' | 'parent';
@@ -126,6 +158,47 @@ export interface AdminCreateUserResult {
   role: 'student' | 'parent';
   temporary_password: string;
   student_id: string | null;
+}
+
+export interface AdminStudentListItem {
+  student_id: string;
+  full_name: string;
+  batch: string | null;
+  class_level: string | null;
+  status: 'active' | 'paused' | 'left';
+  last_attendance_at: string | null;
+}
+
+export interface AdminStudentDetail {
+  student_id: string;
+  user_id: string | null;
+  full_name: string;
+  email: string | null;
+  class_level: string | null;
+  batch_id: string | null;
+  roll_number: string | null;
+  status: 'active' | 'paused' | 'left';
+  attendance_enabled: boolean;
+  remark: string | null;
+  parent_name: string | null;
+  parent_phone: string | null;
+  parent_email: string | null;
+  admission_date: string | null;
+  created_at: string | null;
+  last_attendance_at: string | null;
+}
+
+export interface AdminStudentUpdateInput {
+  full_name?: string;
+  class_level?: string | null;
+  batch_id?: string | null;
+  roll_number?: string | null;
+  status?: 'active' | 'paused' | 'left';
+  attendance_enabled?: boolean;
+  remark?: string | null;
+  parent_name?: string | null;
+  parent_phone?: string | null;
+  parent_email?: string | null;
 }
 
 export class ApiRequestError extends Error {
@@ -180,13 +253,33 @@ async function requestWithTimeout(url: string, options: RequestInit): Promise<Re
   }
 }
 
-export async function markAttendance(accessToken: string): Promise<ApiResponse<MarkAttendanceData>> {
+export async function getAttendancePhotoUploadUrl(
+  accessToken: string,
+  mimeType: string
+): Promise<ApiResponse<AttendancePhotoUploadUrlData>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/attendance/photo-upload-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ mimeType }),
+  });
+
+  return parseApiResponse<AttendancePhotoUploadUrlData>(res);
+}
+
+export async function markAttendance(
+  accessToken: string,
+  input: { photoUrl: string; accuracyMeters: number | null }
+): Promise<ApiResponse<MarkAttendanceData>> {
   const res = await requestWithTimeout(`${BACKEND_URL}/attendance/mark`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
+    body: JSON.stringify(input),
   });
 
   return parseApiResponse<MarkAttendanceData>(res);
@@ -206,6 +299,53 @@ export async function getAdminAttendance(
   });
 
   return parseApiResponse<AdminAttendanceResponseData>(res);
+}
+
+export async function getAdminStudents(
+  accessToken: string
+): Promise<ApiResponse<AdminStudentListItem[]>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/admin/students`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  return parseApiResponse<AdminStudentListItem[]>(res);
+}
+
+export async function getAdminStudent(
+  accessToken: string,
+  studentId: string
+): Promise<ApiResponse<AdminStudentDetail>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/admin/students/${encodeURIComponent(studentId)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+  return parseApiResponse<AdminStudentDetail>(res);
+}
+
+export async function updateAdminStudent(
+  accessToken: string,
+  studentId: string,
+  input: AdminStudentUpdateInput
+): Promise<ApiResponse<AdminStudentDetail>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/admin/students/${encodeURIComponent(studentId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(input),
+    }
+  );
+  return parseApiResponse<AdminStudentDetail>(res);
 }
 
 export async function getAdminStudentAttendanceHistory(
@@ -296,6 +436,39 @@ export async function markAdminManualAttendance(
   });
 
   return parseApiResponse<AdminManualAttendanceResult>(res);
+}
+
+export async function reviewAttendance(
+  accessToken: string,
+  input: AttendanceReviewInput
+): Promise<ApiResponse<AttendanceReviewResult>> {
+  const res = await requestWithTimeout(`${BACKEND_URL}/attendance/review`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseApiResponse<AttendanceReviewResult>(res);
+}
+
+export async function getAttendancePhotoViewUrl(
+  accessToken: string,
+  attendanceId: string
+): Promise<ApiResponse<AttendancePhotoViewUrlResult>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/attendance/${encodeURIComponent(attendanceId)}/photo-view-url`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return parseApiResponse<AttendancePhotoViewUrlResult>(res);
 }
 
 export async function runAbsentNotifications(

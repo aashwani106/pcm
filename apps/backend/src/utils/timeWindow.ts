@@ -1,5 +1,5 @@
-const START_HOUR = Number(process.env.ATTENDANCE_START_HOUR ?? 7);
-const START_MIN = Number(process.env.ATTENDANCE_START_MINUTE ?? 30);
+const START_HOUR = Number(process.env.ATTENDANCE_START_HOUR ?? 0);
+const START_MIN = Number(process.env.ATTENDANCE_START_MINUTE ?? 20);
 const END_HOUR = Number(process.env.ATTENDANCE_END_HOUR ?? 23);
 const END_MIN = Number(process.env.ATTENDANCE_END_MINUTE ?? 15);
 

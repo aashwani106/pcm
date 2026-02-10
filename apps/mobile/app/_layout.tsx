@@ -65,7 +65,7 @@ export default function RootLayout() {
 
       setProfileLoading(true);
       try {
-        const currentProfile = await getMyProfile(session.user.id);
+        const currentProfile = await getMyProfile(session.user.id, session.user.email);
         setProfile(currentProfile);
       } catch {
         setProfile(null);
@@ -103,7 +103,7 @@ export default function RootLayout() {
   }
 
   if (inForceGroup || inAuthGroup) {
-    return <Redirect href={getRoleHomePath(profile?.role)} />;
+    return <Redirect href={getRoleHomePath(profile?.role) as never} />;
   }
 
   return <Slot />;

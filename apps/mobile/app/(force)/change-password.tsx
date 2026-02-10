@@ -90,11 +90,11 @@ export default function ForceChangePasswordScreen() {
       }
 
       await completeMyPasswordChange(authData.session.access_token);
-      const role = await getUserRole(authData.session.user.id);
+      const role = await getUserRole(authData.session.user.id, authData.session.user.email);
 
-      if (role === 'student') router.replace('/(student)');
-      else if (role === 'parent') router.replace('/(parent)');
-      else if (role === 'admin') router.replace('/(admin)');
+      if (role === 'student') router.replace('/(student)' as never);
+      else if (role === 'parent') router.replace('/(parent)' as never);
+      else if (role === 'admin') router.replace('/(admin)' as never);
       else router.replace('/login');
     } catch (error: unknown) {
       showPopup('error', 'Update Failed', getReadableErrorMessage(error, 'Failed to change password.'));

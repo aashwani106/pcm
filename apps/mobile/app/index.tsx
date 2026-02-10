@@ -24,16 +24,16 @@ export default function Index() {
         try {
             setState('loading');
             setMessage('Preparing your experience...');
-            const role = await getUserRole(session.user.id);
-
-            if (role === 'admin') router.replace('/(admin)');
-            else if (role === 'student') router.replace('/(student)');
-            else if (role === 'parent') router.replace('/(parent)');
+            const role = await getUserRole(session.user.id, session.user.email);
+           console.log('e',role)
+            if (role === 'admin') router.replace('/(admin)' as never);
+            else if (role === 'student') router.replace('/(student)' as never);
+            else if (role === 'parent') router.replace('/(parent)' as never);
             else {
                 setState('error');
                 setMessage('Unknown role. Please contact admin.');
             }
-        } catch {
+        } catch(e) {
             setState('error');
             setMessage('Unable to load your profile. Please retry.');
         }

@@ -5,9 +5,11 @@ import { useRouter } from 'expo-router';
 import { AttendanceCalendarCard } from '../../components/calendar/AttendanceCalendarCard';
 import { BorderRadius, Colors, Spacing, Typography } from '../../../constants/theme';
 import {
+  getAttendancePhotoViewUrl,
   getParentAttendanceCalendar,
   getReadableErrorMessage,
   ParentCalendarData,
+  reviewAttendance,
 } from '../../../services/backend';
 import { supabase } from '../../../services/supabase';
 import { toYearMonth } from '../../utils/calendar';
@@ -22,6 +24,7 @@ export default function ParentCalendarScreen() {
   const [state, setState] = useState<ScreenState>('loading');
   const [message, setMessage] = useState('Loading calendar...');
   const [refreshing, setRefreshing] = useState(false);
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   const fetchCalendar = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -42,6 +45,35 @@ export default function ParentCalendarScreen() {
       setRefreshing(false);
     }
   }, [month, selectedStudentId]);
+
+  async function loadPhotoViewUrl(attendanceId: string) {
+    const { data: sessionData, error } = await supabase.auth.getSession();
+    if (error || !sessionData.session?.access_token) throw new Error('Not authenticated');
+    const response = await getAttendancePhotoViewUrl(sessionData.session.access_token, attendanceId);
+    return response.data?.view_url ?? null;
+  }
+
+  async function handleReview(input: {
+    attendanceId: string;
+    status: 'accepted' | 'flagged';
+    note?: string;
+  }) {
+    try {
+      setIsSavingReview(true);
+      const { data: sessionData, error } = await supabase.auth.getSession();
+      if (error || !sessionData.session?.access_token) throw new Error('Not authenticated');
+      await reviewAttendance(sessionData.session.access_token, {
+        attendance_id: input.attendanceId,
+        review_status: input.status,
+        review_note: input.note,
+      });
+      await fetchCalendar(true);
+    } catch (err: unknown) {
+      setMessage(getReadableErrorMessage(err, 'Failed to save review.'));
+    } finally {
+      setIsSavingReview(false);
+    }
+  }
 
   useEffect(() => {
     fetchCalendar();
@@ -79,6 +111,12 @@ export default function ParentCalendarScreen() {
           holidays={data?.calendar.holidays ?? []}
           state={state}
           message={message}
+          reviewActions={{
+            loading: isSavingReview,
+            canReview: true,
+            onReviewSubmit: handleReview,
+            onLoadPhotoUrl: loadPhotoViewUrl,
+          }}
         />
       </ScrollView>
     </SafeAreaView>

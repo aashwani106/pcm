@@ -281,9 +281,14 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.pageTitle}>Admin Dashboard</Text>
                 <Text style={styles.pageSubtitle}>{formatHeaderDate(selectedDate)}</Text>
               </View>
-              <Pressable onPress={handleLogout} style={styles.logoutButton}>
-                <Text style={styles.logoutText}>Logout</Text>
-              </Pressable>
+              <View style={styles.headerActions}>
+                <Pressable onPress={() => router.push('/(admin)/students' as never)} style={styles.studentsButton}>
+                  <Text style={styles.studentsText}>Students</Text>
+                </Pressable>
+                <Pressable onPress={handleLogout} style={styles.logoutButton}>
+                  <Text style={styles.logoutText}>Logout</Text>
+                </Pressable>
+              </View>
             </View>
 
             <SectionCard title="Attendance Overview" subtitle="Track daily attendance and notify parents">
@@ -453,6 +458,24 @@ const styles = StyleSheet.create({
     fontFamily: Typography.body,
     fontSize: 13,
     color: Colors.textMuted,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  studentsButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(76,175,80,0.12)',
+    borderColor: 'rgba(76,175,80,0.35)',
+    borderWidth: 1,
+  },
+  studentsText: {
+    fontFamily: Typography.medium,
+    fontSize: 13,
+    color: Colors.primary,
   },
   logoutButton: {
     paddingHorizontal: 14,

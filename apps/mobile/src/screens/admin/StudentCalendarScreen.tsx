@@ -6,10 +6,12 @@ import { AttendanceCalendarCard } from '../../components/calendar/AttendanceCale
 import { FeedbackPopup, FeedbackType } from '../../../components/feedback-popup';
 import { BorderRadius, Colors, Spacing, Typography } from '../../../constants/theme';
 import {
+  getAttendancePhotoViewUrl,
   AdminStudentAttendanceCalendarData,
   getAdminStudentAttendanceCalendar,
   getReadableErrorMessage,
   markAdminManualAttendance,
+  reviewAttendance,
 } from '../../../services/backend';
 import { supabase } from '../../../services/supabase';
 import { toYearMonth } from '../../utils/calendar';
@@ -27,6 +29,7 @@ export default function AdminStudentCalendarScreen() {
   const [message, setMessage] = useState('Loading calendar...');
   const [refreshing, setRefreshing] = useState(false);
   const [isSavingOverride, setIsSavingOverride] = useState(false);
+  const [isSavingReview, setIsSavingReview] = useState(false);
   const [popup, setPopup] = useState<{
     visible: boolean;
     type: FeedbackType;
@@ -120,6 +123,40 @@ export default function AdminStudentCalendarScreen() {
     }
   }
 
+  async function loadPhotoViewUrl(attendanceId: string) {
+    const { data: authData, error } = await supabase.auth.getSession();
+    if (error || !authData.session?.access_token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await getAttendancePhotoViewUrl(authData.session.access_token, attendanceId);
+    return response.data?.view_url ?? null;
+  }
+
+  async function handleReview(input: {
+    attendanceId: string;
+    status: 'accepted' | 'flagged';
+    note?: string;
+  }) {
+    try {
+      setIsSavingReview(true);
+      const { data: authData, error } = await supabase.auth.getSession();
+      if (error || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+      await reviewAttendance(authData.session.access_token, {
+        attendance_id: input.attendanceId,
+        review_status: input.status,
+        review_note: input.note,
+      });
+      showPopup('success', 'Review Saved', `Marked attendance as ${input.status}.`);
+      await fetchCalendar(true);
+    } catch (error: unknown) {
+      showPopup('error', 'Review Failed', getReadableErrorMessage(error, 'Failed to save review.'));
+    } finally {
+      setIsSavingReview(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FeedbackPopup
@@ -157,6 +194,12 @@ export default function AdminStudentCalendarScreen() {
           message={message}
           showLegend
           manualOverride={{ loading: isSavingOverride, onSubmit: handleManualOverride }}
+          reviewActions={{
+            loading: isSavingReview,
+            canReview: true,
+            onReviewSubmit: handleReview,
+            onLoadPhotoUrl: loadPhotoViewUrl,
+          }}
         />
       </ScrollView>
     </SafeAreaView>

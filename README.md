@@ -101,3 +101,13 @@ For more detailed technical information, refer to:
 *   [Requirements](./docs/requirement.md)
 *   [High-Level Design](./docs/hld.md)
 *   [Project Structure](./docs/project-structure.md)
+
+---
+
+## 🧪 Local Streaming Test Accounts
+Development-only accounts used for local live-class testing:
+
+- Student: `studentnew@gmail.com` / `student`
+- Teacher: `teacher@gmail.com` / `test@teacher`
+
+Use these only in local/dev environments. Rotate or remove before any shared/staging/production use.

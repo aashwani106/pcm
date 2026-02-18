@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev:backend": "npm --workspace apps/backend run dev",
-    "dev:mobile": "npm --workspace apps/mobile run start"
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "dev:website": "npm --workspace apps/website run dev"
   }
 }

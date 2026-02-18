@@ -3,7 +3,7 @@ import { findProfileRoleById } from '../models/profile.model';
 import { ApiError } from '../utils/ApiError';
 import { AuthenticatedRequest } from './auth.middleware';
 
-export function requireRole(role: 'student' | 'admin' | 'parent') {
+export function requireRole(role: 'student' | 'admin' | 'parent' | 'teacher') {
   return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     try {
       const userId = req.user?.id;
@@ -30,3 +30,4 @@ export function requireRole(role: 'student' | 'admin' | 'parent') {
 export const requireStudent = requireRole('student');
 export const requireAdmin = requireRole('admin');
 export const requireParent = requireRole('parent');
+export const requireTeacher = requireRole('teacher');

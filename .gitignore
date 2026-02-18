@@ -59,6 +59,18 @@ apps/mobile/.env
 apps/mobile/.expo/
 
 # ===============================
+# Website (Next.js) specific
+# ===============================
+apps/website/node_modules/
+apps/website/.next/
+apps/website/out/
+apps/website/.env.local
+apps/website/.env.development.local
+apps/website/.env.test.local
+apps/website/.env.production.local
+apps/website/.vercel/
+
+# ===============================
 # Cache
 # ===============================
 .cache/

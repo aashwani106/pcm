@@ -41,12 +41,13 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 
 ## 📂 Project Structure
 
-This project follows a **Monorepo** architecture to keep the mobile app, backend, and shared logic in one place.
+This project follows a Monorepo architecture to keep the mobile app, backend, and shared logic in one place.
 
 ```text
 pcm-app/
 ├── apps/
 │   ├── mobile/           # React Native Expo App
+│   ├── website/          # Next.js Web App (courses + live classes)
 │   └── backend/          # Node.js API Server
 ├── services/
 │   └── face-recognition/ # Python Face Embedding Service

@@ -157,7 +157,7 @@ export default function HomePage() {
         transition={{ duration: 0.32 }}
       >
         <h2>Ready to join the next batch?</h2>
-        <Link href="/courses" className="landing-btn landing-btn-primary">
+        <Link href="/enroll" className="landing-btn landing-btn-primary">
           Enroll Now
         </Link>
       </motion.section>

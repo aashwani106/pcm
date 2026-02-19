@@ -30,8 +30,8 @@ export function HeroSection() {
           and parent-visible progress.
         </motion.p>
         <motion.div variants={fadeUp} className="landing-actions">
-          <Link href="/courses" className="landing-btn landing-btn-primary">
-            View Courses
+          <Link href="/enroll" className="landing-btn landing-btn-primary">
+            Enroll Now
           </Link>
           <Link href="/classroom" className="landing-btn landing-btn-secondary">
             Login

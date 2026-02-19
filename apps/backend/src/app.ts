@@ -6,6 +6,7 @@ import adminRoutes from './routes/admin.routes';
 import notificationRoutes from './routes/notification.routes';
 import calendarRoutes from './routes/calendar.routes';
 import classesRoutes from './routes/classes.routes';
+import enrollmentRoutes from './routes/enrollment.routes';
 import { ApiResponse } from './utils/ApiResponse';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { generateLiveKitToken } from './services/livekit.service';
@@ -38,6 +39,7 @@ app.use('/admin', adminRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/calendar', calendarRoutes);
 app.use('/classes', classesRoutes);
+app.use('/enrollments', enrollmentRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json(new ApiResponse(false, null, 'Route not found', null));

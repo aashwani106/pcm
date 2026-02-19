@@ -18,9 +18,13 @@ import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme
 import { useAuth } from '../../hooks/useAuth';
 import {
   adminCreateManagedUser,
+  approveAdminEnrollmentRequest,
+  EnrollmentRequestRecord,
   AdminAttendanceResponseData,
+  getAdminEnrollmentRequests,
   getAdminAttendance,
   getReadableErrorMessage,
+  rejectAdminEnrollmentRequest,
   runAbsentNotifications,
 } from '../../services/backend';
 import { supabase } from '../../services/supabase';
@@ -112,6 +116,9 @@ export default function AdminDashboardScreen() {
   const [createParentId, setCreateParentId] = useState('');
   const [createBatch, setCreateBatch] = useState('');
   const [lastCreatedParentId, setLastCreatedParentId] = useState('');
+  const [enrollmentRequests, setEnrollmentRequests] = useState<EnrollmentRequestRecord[]>([]);
+  const [loadingEnrollments, setLoadingEnrollments] = useState(false);
+  const [processingEnrollmentId, setProcessingEnrollmentId] = useState<string | null>(null);
   const [popup, setPopup] = useState<{
     visible: boolean;
     type: FeedbackType;
@@ -166,10 +173,33 @@ export default function AdminDashboardScreen() {
     [session]
   );
 
+  const fetchEnrollmentRequests = useCallback(async () => {
+    if (!session) return;
+    setLoadingEnrollments(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getSession();
+      if (authError || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await getAdminEnrollmentRequests(authData.session.access_token, 'pending');
+      setEnrollmentRequests(response.data ?? []);
+    } catch (error: unknown) {
+      showPopup(
+        'error',
+        'Enrollment Load Failed',
+        getReadableErrorMessage(error, 'Unable to load enrollment requests.')
+      );
+    } finally {
+      setLoadingEnrollments(false);
+    }
+  }, [session]);
+
   useEffect(() => {
     if (authLoading || !session) return;
     fetchAttendance(selectedDate);
-  }, [authLoading, fetchAttendance, selectedDate, session]);
+    fetchEnrollmentRequests();
+  }, [authLoading, fetchAttendance, fetchEnrollmentRequests, selectedDate, session]);
 
   const records = useMemo(() => data?.records ?? [], [data?.records]);
 
@@ -204,6 +234,51 @@ export default function AdminDashboardScreen() {
       await supabase.auth.signOut();
     } catch (error: unknown) {
       showPopup('error', 'Logout Error', getReadableErrorMessage(error, 'Unable to logout right now.'));
+    }
+  }
+
+  async function handleApproveEnrollment(requestId: string) {
+    if (!session) return;
+    try {
+      setProcessingEnrollmentId(requestId);
+      const { data: authData, error: authError } = await supabase.auth.getSession();
+      if (authError || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await approveAdminEnrollmentRequest(authData.session.access_token, requestId);
+      const payload = response.data;
+      if (!payload) throw new Error('Approval failed');
+
+      setEnrollmentRequests((prev) => prev.filter((item) => item.id !== requestId));
+      showPopup(
+        'success',
+        'Enrollment Approved',
+        `Student: ${payload.student_account.email}\nParent: ${payload.parent_account.email}\nStudent Temp Password: ${payload.student_account.temporary_password}\nParent Temp Password: ${payload.parent_account.temporary_password}`
+      );
+    } catch (error: unknown) {
+      showPopup('error', 'Approve Failed', getReadableErrorMessage(error, 'Unable to approve request.'));
+    } finally {
+      setProcessingEnrollmentId(null);
+    }
+  }
+
+  async function handleRejectEnrollment(requestId: string) {
+    if (!session) return;
+    try {
+      setProcessingEnrollmentId(requestId);
+      const { data: authData, error: authError } = await supabase.auth.getSession();
+      if (authError || !authData.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      await rejectAdminEnrollmentRequest(authData.session.access_token, requestId);
+      setEnrollmentRequests((prev) => prev.filter((item) => item.id !== requestId));
+      showPopup('success', 'Enrollment Rejected', 'Enrollment request rejected successfully.');
+    } catch (error: unknown) {
+      showPopup('error', 'Reject Failed', getReadableErrorMessage(error, 'Unable to reject request.'));
+    } finally {
+      setProcessingEnrollmentId(null);
     }
   }
 
@@ -270,7 +345,10 @@ export default function AdminDashboardScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => fetchAttendance(selectedDate, true)}
+            onRefresh={async () => {
+              await fetchAttendance(selectedDate, true);
+              await fetchEnrollmentRequests();
+            }}
             tintColor={Colors.primary}
           />
         }
@@ -386,6 +464,60 @@ export default function AdminDashboardScreen() {
                   {isCreatingUser ? 'Creating...' : `Create ${createRole === 'student' ? 'Student' : 'Parent'}`}
                 </Text>
               </Pressable>
+            </SectionCard>
+
+            <SectionCard title="Enrollment Requests" subtitle="Review and approve enrollment submissions">
+              {loadingEnrollments ? (
+                <View style={styles.enrollLoadingRow}>
+                  <ActivityIndicator color={Colors.primary} />
+                  <Text style={styles.enrollLoadingText}>Loading requests...</Text>
+                </View>
+              ) : enrollmentRequests.length === 0 ? (
+                <Text style={styles.enrollEmptyText}>No pending enrollment requests.</Text>
+              ) : (
+                enrollmentRequests.map((request) => (
+                  <View key={request.id} style={styles.enrollCard}>
+                    <View style={styles.enrollTopRow}>
+                      <Text style={styles.enrollStudentName}>{request.student_name}</Text>
+                      <Text style={styles.enrollBadge}>
+                        Class {request.class_level} • {request.stream}
+                      </Text>
+                    </View>
+                    <Text style={styles.enrollMeta}>{request.student_email}</Text>
+                    <Text style={styles.enrollMeta}>
+                      Parent: {request.parent_name} • {request.parent_phone}
+                    </Text>
+                    <Text style={styles.enrollMeta}>
+                      Board: {request.board}
+                      {typeof request.previous_marks === 'number' ? ` • Marks: ${request.previous_marks}%` : ''}
+                      {request.city ? ` • ${request.city}` : ''}
+                    </Text>
+
+                    <View style={styles.enrollActionRow}>
+                      <Pressable
+                        style={[
+                          styles.enrollApproveButton,
+                          processingEnrollmentId === request.id && styles.enrollActionDisabled,
+                        ]}
+                        onPress={() => handleApproveEnrollment(request.id)}
+                        disabled={processingEnrollmentId === request.id}
+                      >
+                        <Text style={styles.enrollApproveText}>Approve</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.enrollRejectButton,
+                          processingEnrollmentId === request.id && styles.enrollActionDisabled,
+                        ]}
+                        onPress={() => handleRejectEnrollment(request.id)}
+                        disabled={processingEnrollmentId === request.id}
+                      >
+                        <Text style={styles.enrollRejectText}>Reject</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
             </SectionCard>
 
             <View style={styles.listHeaderRow}>
@@ -664,6 +796,94 @@ const styles = StyleSheet.create({
     fontFamily: Typography.heading,
     fontSize: 14,
     color: Colors.white,
+  },
+  enrollLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  enrollLoadingText: {
+    fontFamily: Typography.body,
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  enrollEmptyText: {
+    fontFamily: Typography.body,
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  enrollCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#FAF9F5',
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  enrollTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  enrollStudentName: {
+    fontFamily: Typography.heading,
+    color: Colors.text,
+    fontSize: 15,
+    flex: 1,
+  },
+  enrollBadge: {
+    fontFamily: Typography.medium,
+    fontSize: 11,
+    color: Colors.primary,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    borderColor: 'rgba(76,175,80,0.3)',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  enrollMeta: {
+    marginTop: 4,
+    fontFamily: Typography.body,
+    color: Colors.textMuted,
+    fontSize: 12,
+  },
+  enrollActionRow: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  enrollApproveButton: {
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    alignItems: 'center',
+    paddingVertical: 9,
+  },
+  enrollApproveText: {
+    fontFamily: Typography.medium,
+    fontSize: 13,
+    color: Colors.primary,
+  },
+  enrollRejectButton: {
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.error,
+    backgroundColor: 'rgba(211,47,47,0.10)',
+    alignItems: 'center',
+    paddingVertical: 9,
+  },
+  enrollRejectText: {
+    fontFamily: Typography.medium,
+    fontSize: 13,
+    color: Colors.error,
+  },
+  enrollActionDisabled: {
+    opacity: 0.6,
   },
   listHeaderRow: {
     marginTop: 2,

@@ -1479,6 +1479,103 @@ a {
   color: #4f5951;
 }
 
+.enroll-page {
+  min-height: 100vh;
+  background: #f7f6f2;
+  padding: 2.4rem 1.25rem;
+}
+
+.enroll-card {
+  max-width: 980px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #e3dfd4;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.enroll-head h1 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+}
+
+.enroll-head p {
+  margin: 0.45rem 0 0;
+  color: #596157;
+}
+
+.enroll-form {
+  margin-top: 1rem;
+}
+
+.enroll-form h2 {
+  margin: 1rem 0 0.6rem;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.enroll-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.enroll-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #37403a;
+  font-weight: 600;
+}
+
+.enroll-grid input,
+.enroll-grid select {
+  border: 1px solid #d8d2c4;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.66rem 0.72rem;
+  font-size: 0.95rem;
+  color: #111412;
+}
+
+.enroll-grid input:focus,
+.enroll-grid select:focus {
+  outline: none;
+  border-color: #2a6b45;
+  box-shadow: 0 0 0 3px rgba(42, 107, 69, 0.12);
+}
+
+.enroll-submit {
+  margin-top: 1rem;
+  width: 100%;
+  display: inline-grid;
+  place-items: center;
+}
+
+.enroll-error {
+  margin-top: 0.7rem;
+  color: #a03030;
+  font-size: 0.9rem;
+}
+
+.enroll-success {
+  max-width: 700px;
+  text-align: center;
+  padding: 2rem 1.2rem;
+}
+
+.enroll-success h1 {
+  margin: 0;
+}
+
+.enroll-success p {
+  margin: 0.55rem 0 1rem;
+  color: #515b53;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1597,5 +1694,9 @@ a {
     flex-direction: column;
     align-items: flex-start;
     padding: 2rem 1rem;
+  }
+
+  .enroll-grid {
+    grid-template-columns: 1fr;
   }
 }

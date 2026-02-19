@@ -226,6 +226,41 @@ export interface AdminStudentUpdateInput {
   parent_email?: string | null;
 }
 
+export interface EnrollmentRequestRecord {
+  id: string;
+  student_name: string;
+  student_email: string;
+  class_level: string;
+  stream: string;
+  board: string;
+  parent_name: string;
+  parent_phone: string;
+  parent_email: string;
+  previous_marks: number | null;
+  city: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
+
+export interface EnrollmentApprovalResult {
+  request_id: string;
+  status: 'approved';
+  parent_account: {
+    email: string;
+    temporary_password: string;
+  };
+  student_account: {
+    email: string;
+    temporary_password: string;
+    student_id: string | null;
+  };
+}
+
+export interface EnrollmentRejectionResult {
+  request_id: string;
+  status: 'rejected';
+}
+
 export class ApiRequestError extends Error {
   public readonly status: number;
   public readonly details: unknown;
@@ -581,6 +616,58 @@ export async function completeMyPasswordChange(
   });
 
   return parseApiResponse<{ user_id: string; role: string; must_change_password: boolean }>(res);
+}
+
+export async function getAdminEnrollmentRequests(
+  accessToken: string,
+  status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending'
+): Promise<ApiResponse<EnrollmentRequestRecord[]>> {
+  const query = status === 'all' ? '' : `?status=${encodeURIComponent(status)}`;
+  const res = await requestWithTimeout(`${BACKEND_URL}/enrollments/admin${query}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiResponse<EnrollmentRequestRecord[]>(res);
+}
+
+export async function approveAdminEnrollmentRequest(
+  accessToken: string,
+  requestId: string
+): Promise<ApiResponse<EnrollmentApprovalResult>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/enrollments/admin/${encodeURIComponent(requestId)}/approve`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return parseApiResponse<EnrollmentApprovalResult>(res);
+}
+
+export async function rejectAdminEnrollmentRequest(
+  accessToken: string,
+  requestId: string,
+  reason?: string
+): Promise<ApiResponse<EnrollmentRejectionResult>> {
+  const res = await requestWithTimeout(
+    `${BACKEND_URL}/enrollments/admin/${encodeURIComponent(requestId)}/reject`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ reason: reason?.trim() || undefined }),
+    }
+  );
+
+  return parseApiResponse<EnrollmentRejectionResult>(res);
 }
 
 export { getReadableErrorMessage };

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 const plans = [
   {
@@ -91,7 +92,9 @@ export function PricingSection() {
               ))}
             </ul>
 
-            <button className="landing-btn landing-btn-primary pricing-btn">Enroll</button>
+            <Link href="/enroll" className="landing-btn landing-btn-primary pricing-btn">
+              Enroll
+            </Link>
           </motion.article>
         ))}
       </motion.div>

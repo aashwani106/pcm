@@ -1226,6 +1226,117 @@ a {
   line-height: 1.6;
 }
 
+.landing-pricing-wrap {
+  padding-top: 2rem;
+}
+
+.landing-pricing-sub {
+  margin: 0.5rem 0 0;
+  color: #4f5951;
+  font-size: 0.98rem;
+}
+
+.landing-pricing-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.landing-pricing-card {
+  border-radius: 16px;
+  border: 1px solid #d7cfbf;
+  background: #ece8dd;
+  padding: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-pricing-card:hover {
+  border-color: #c4bcae;
+  box-shadow: 0 12px 28px rgba(18, 28, 19, 0.1);
+}
+
+.landing-pricing-card.popular {
+  border-color: #99b7a5;
+  background: #e7efe8;
+}
+
+.landing-pricing-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.landing-pricing-head h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.landing-pricing-head p {
+  margin: 0.2rem 0 0;
+  color: #566258;
+  font-size: 0.85rem;
+}
+
+.pricing-pill {
+  align-self: flex-start;
+  border: 1px solid #7da48c;
+  background: #dbeadd;
+  color: #21543a;
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.landing-price-line {
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.32rem;
+}
+
+.landing-price-line .currency {
+  color: #3f4b43;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.landing-price-line .price {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.landing-price-line .period {
+  color: #536057;
+  font-size: 0.82rem;
+}
+
+.landing-pricing-list {
+  margin: 0.85rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.42rem;
+  color: #2f3832;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.pricing-btn {
+  margin-top: 0.95rem;
+  width: 100%;
+  display: inline-grid;
+  place-items: center;
+}
+
+.landing-pricing-note {
+  margin: 0.85rem 0 0;
+  color: #4f5951;
+  font-size: 0.9rem;
+}
+
 .landing-testimonials {
   padding-top: 2rem;
 }
@@ -1473,6 +1584,7 @@ a {
 
   .landing-stats,
   .landing-grid-2,
+  .landing-pricing-grid,
   .landing-teacher-grid,
   .landing-achiever-grid,
   .landing-courses-grid,

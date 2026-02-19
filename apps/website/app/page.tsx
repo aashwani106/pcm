@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CoursesSection } from "./components/courses";
 import { FeaturesSection } from "./components/features";
 import { HeroSection } from "./components/hero";
+import { PricingSection } from "./components/pricing-section";
 import { StatsSection } from "./components/stats";
 
 const achievers = [
@@ -64,6 +65,7 @@ export default function HomePage() {
       <StatsSection />
       <FeaturesSection />
       <CoursesSection />
+      <PricingSection />
 
       <section className="landing-section">
         <div className="landing-section-head">

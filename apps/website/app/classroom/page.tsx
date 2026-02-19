@@ -9,6 +9,7 @@ import { connectToRoom } from "../../lib/livekit";
 type Role = "teacher" | "student" | "admin";
 type ClassStatus = "scheduled" | "live" | "ended";
 type RoomState = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
+
 const SESSION_STORAGE_KEY = "pcm_classroom_session_v1";
 
 type ClassStatePayload = {
@@ -28,10 +29,7 @@ function detachVideoElements(container: HTMLDivElement | null) {
   container.innerHTML = "";
 }
 
-function attachRemoteTrack(
-  room: Room,
-  container: HTMLDivElement | null
-) {
+function attachRemoteTrack(room: Room, container: HTMLDivElement | null) {
   if (!container) return;
   detachVideoElements(container);
 
@@ -63,18 +61,21 @@ export default function ClassroomPage() {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [roomState, setRoomState] = useState<RoomState>("idle");
   const [cameraLive, setCameraLive] = useState(false);
+  const [micLive, setMicLive] = useState(false);
   const [teacherLeft, setTeacherLeft] = useState(false);
+  const [teacherJoinedNotice, setTeacherJoinedNotice] = useState(false);
   const [classTeacherId, setClassTeacherId] = useState<string | null>(null);
   const [classStatus, setClassStatus] = useState<ClassStatus | null>(null);
   const [classStatusLoading, setClassStatusLoading] = useState(false);
 
   const roomRef = useRef<Room | null>(null);
-  const localVideoWrapRef = useRef<HTMLDivElement>(null);
-  const remoteVideoWrapRef = useRef<HTMLDivElement>(null);
+  const mainVideoWrapRef = useRef<HTMLDivElement>(null);
+  const localPreviewWrapRef = useRef<HTMLDivElement>(null);
 
   const isLoggedIn = Boolean(authUserEmail && accessToken);
   const isJoinableRoomState = roomState === "idle" || roomState === "disconnected";
   const isConnected = roomState === "connected" || roomState === "reconnecting";
+  const isTeacherLike = role === "teacher" || role === "admin";
 
   const isClassScheduled = classStatus === "scheduled";
   const isClassLive = classStatus === "live";
@@ -118,13 +119,41 @@ export default function ClassroomPage() {
     setParticipantCount(room.remoteParticipants.size + 1);
   }, []);
 
-  const updateCameraIndicator = useCallback((room: Room) => {
+  const updateLocalIndicators = useCallback((room: Room) => {
     const publications = Array.from(room.localParticipant.trackPublications.values());
-    const hasLiveCamera = publications.some(
-      (pub) => pub.track?.kind === Track.Kind.Video && !pub.isMuted
-    );
-    setCameraLive(hasLiveCamera);
+    const cameraPublication = publications.find((pub) => pub.track?.kind === Track.Kind.Video);
+    const microphonePublication = publications.find((pub) => pub.track?.kind === Track.Kind.Audio);
+    setCameraLive(Boolean(cameraPublication && !cameraPublication.isMuted));
+    setMicLive(Boolean(microphonePublication && !microphonePublication.isMuted));
   }, []);
+
+  const attachLocalPreview = useCallback((room: Room) => {
+    if (!localPreviewWrapRef.current) return;
+    detachVideoElements(localPreviewWrapRef.current);
+
+    const pubs = Array.from(room.localParticipant.trackPublications.values());
+    const cameraPub = pubs.find((pub) => pub.track?.kind === Track.Kind.Video);
+    if (cameraPub?.track) {
+      localPreviewWrapRef.current.appendChild(cameraPub.track.attach());
+    }
+  }, []);
+
+  const renderMainStage = useCallback(
+    (room: Room) => {
+      if (!mainVideoWrapRef.current) return;
+      if (role === "teacher") {
+        detachVideoElements(mainVideoWrapRef.current);
+        const pubs = Array.from(room.localParticipant.trackPublications.values());
+        const cameraPub = pubs.find((pub) => pub.track?.kind === Track.Kind.Video);
+        if (cameraPub?.track) {
+          mainVideoWrapRef.current.appendChild(cameraPub.track.attach());
+        }
+        return;
+      }
+      attachRemoteTrack(room, mainVideoWrapRef.current);
+    },
+    [role]
+  );
 
   const refreshClassState = useCallback(
     async (silent = false) => {
@@ -170,18 +199,6 @@ export default function ClassroomPage() {
   );
 
   useEffect(() => {
-    refreshClassState();
-  }, [refreshClassState]);
-
-  useEffect(() => {
-    if (!isLoggedIn || !classId.trim()) return;
-    const interval = setInterval(() => {
-      void refreshClassState(true);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [isLoggedIn, classId, refreshClassState]);
-
-  useEffect(() => {
     try {
       const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
       if (!raw) return;
@@ -221,11 +238,23 @@ export default function ClassroomPage() {
   }, [classId, role, accessToken, authUserEmail, email]);
 
   useEffect(() => {
+    refreshClassState();
+  }, [refreshClassState]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !classId.trim()) return;
+    const interval = setInterval(() => {
+      void refreshClassState(true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, classId, refreshClassState]);
+
+  useEffect(() => {
     return () => {
       roomRef.current?.disconnect();
       roomRef.current = null;
-      detachVideoElements(localVideoWrapRef.current);
-      detachVideoElements(remoteVideoWrapRef.current);
+      detachVideoElements(mainVideoWrapRef.current);
+      detachVideoElements(localPreviewWrapRef.current);
     };
   }, []);
 
@@ -239,6 +268,12 @@ export default function ClassroomPage() {
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []);
+
+  useEffect(() => {
+    if (!teacherJoinedNotice) return;
+    const timeout = setTimeout(() => setTeacherJoinedNotice(false), 2500);
+    return () => clearTimeout(timeout);
+  }, [teacherJoinedNotice]);
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) return;
@@ -294,23 +329,24 @@ export default function ClassroomPage() {
       roomRef.current?.disconnect();
       const room = await connectToRoom(payload.token);
       roomRef.current = room;
-      setRoomState("connecting");
+      setRoomState(room.state === ConnectionState.Connected ? "connected" : "connecting");
       setTeacherLeft(false);
       setRoomName(payload.roomName);
       setConnectionState(room.state);
-      if (room.state === ConnectionState.Connected) {
-        setRoomState("connected");
-      }
       updateParticipantCount(room);
-      updateCameraIndicator(room);
+      updateLocalIndicators(room);
+      renderMainStage(room);
+      attachLocalPreview(room);
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         console.log("Participant joined:", participant.identity);
         if (role === "student" && classTeacherId && participant.identity === classTeacherId) {
           setTeacherLeft(false);
+          setTeacherJoinedNotice(true);
+          setStatus("Teacher joined");
         }
         updateParticipantCount(room);
-        attachRemoteTrack(room, remoteVideoWrapRef.current);
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
@@ -320,7 +356,7 @@ export default function ClassroomPage() {
           setStatus("Teacher has left the session");
         }
         updateParticipantCount(room);
-        attachRemoteTrack(room, remoteVideoWrapRef.current);
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.ConnectionStateChanged, (nextState) => {
@@ -347,50 +383,48 @@ export default function ClassroomPage() {
         setConnectionState(ConnectionState.Disconnected);
         setParticipantCount(0);
         setCameraLive(false);
+        setMicLive(false);
         setStatus("Disconnected");
-        detachVideoElements(localVideoWrapRef.current);
-        detachVideoElements(remoteVideoWrapRef.current);
+        detachVideoElements(mainVideoWrapRef.current);
+        detachVideoElements(localPreviewWrapRef.current);
       });
 
       room.on(RoomEvent.TrackSubscribed, (track) => {
-        if (track.kind !== Track.Kind.Video || !remoteVideoWrapRef.current) return;
-        detachVideoElements(remoteVideoWrapRef.current);
-        remoteVideoWrapRef.current.appendChild(track.attach());
+        if (track.kind !== Track.Kind.Video) return;
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.TrackUnsubscribed, () => {
-        attachRemoteTrack(room, remoteVideoWrapRef.current);
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.LocalTrackPublished, () => {
-        updateCameraIndicator(room);
+        updateLocalIndicators(room);
+        attachLocalPreview(room);
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.LocalTrackUnpublished, () => {
-        updateCameraIndicator(room);
+        updateLocalIndicators(room);
+        attachLocalPreview(room);
+        renderMainStage(room);
       });
 
       room.on(RoomEvent.TrackMuted, () => {
-        updateCameraIndicator(room);
+        updateLocalIndicators(room);
       });
 
       room.on(RoomEvent.TrackUnmuted, () => {
-        updateCameraIndicator(room);
+        updateLocalIndicators(room);
       });
 
       if (role === "teacher") {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
-
-        const pubs = Array.from(room.localParticipant.trackPublications.values());
-        const cameraPub = pubs.find((pub) => pub.track?.kind === Track.Kind.Video);
-        if (cameraPub?.track && localVideoWrapRef.current) {
-          detachVideoElements(localVideoWrapRef.current);
-          localVideoWrapRef.current.appendChild(cameraPub.track.attach());
-        }
-        updateCameraIndicator(room);
+        updateLocalIndicators(room);
+        attachLocalPreview(room);
+        renderMainStage(room);
       }
-      attachRemoteTrack(room, remoteVideoWrapRef.current);
 
       setStatus(role === "teacher" ? "Live as teacher" : "Connected as viewer");
       await refreshClassState(true);
@@ -469,165 +503,220 @@ export default function ClassroomPage() {
     setConnectionState(ConnectionState.Disconnected);
     setParticipantCount(0);
     setCameraLive(false);
+    setMicLive(false);
     setStatus("Disconnected");
-    detachVideoElements(localVideoWrapRef.current);
-    detachVideoElements(remoteVideoWrapRef.current);
+    detachVideoElements(mainVideoWrapRef.current);
+    detachVideoElements(localPreviewWrapRef.current);
+  }
+
+  async function handleToggleCamera() {
+    const room = roomRef.current;
+    if (!room || role !== "teacher") return;
+    await room.localParticipant.setCameraEnabled(!cameraLive);
+    updateLocalIndicators(room);
+    renderMainStage(room);
+    attachLocalPreview(room);
+  }
+
+  async function handleToggleMic() {
+    const room = roomRef.current;
+    if (!room || role !== "teacher") return;
+    await room.localParticipant.setMicrophoneEnabled(!micLive);
+    updateLocalIndicators(room);
   }
 
   const connectionLabel =
     connectionState === ConnectionState.Connected
       ? "Connected"
       : connectionState === ConnectionState.Connecting
-        ? "Connecting..."
+        ? "Connecting"
         : connectionState === ConnectionState.Reconnecting
-          ? "Reconnecting..."
+          ? "Reconnecting"
           : "Disconnected";
 
   const classLabel = classStatusLoading ? "loading" : classStatus ?? "unknown";
 
   return (
-    <main className="classroom-shell">
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="classroom-card"
-      >
-        <header className="classroom-header polished">
-          <div>
-            <h1>Live Classroom</h1>
-            <p>Join securely using backend-issued LiveKit token.</p>
-          </div>
-          <div className="state-badges">
-            <span className={`status-pill status-${statusTone}`}>{status}</span>
-            <span className="role-pill">{role.toUpperCase()}</span>
-            <span className={`class-pill class-${classStatus ?? "unknown"}`}>Class: {classLabel}</span>
-            <span className="connection-pill">{connectionLabel}</span>
-          </div>
-        </header>
-
-        <div className="control-grid">
-          <section className="control-section">
-            <div className="section-head">
-              <h3>Authentication</h3>
-              <p>Sign in once and continue with role-based actions.</p>
+    <main className="classroom-shell coaching-shell">
+      {!isConnected ? (
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="classroom-card"
+        >
+          <header className="classroom-header polished">
+            <div>
+              <h1>Live Classroom</h1>
+              <p>Join securely using backend-issued LiveKit token.</p>
             </div>
-            <div className="form-grid">
-              <label>
-                Login Email
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="teacher@domain.com"
-                />
-              </label>
+            <div className="state-badges">
+              <span className={`status-pill status-${statusTone}`}>{status}</span>
+              <span className="role-pill">{role.toUpperCase()}</span>
+              <span className={`class-pill class-${classStatus ?? "unknown"}`}>Class: {classLabel}</span>
+              <span className="connection-pill">{connectionLabel}</span>
+            </div>
+          </header>
 
-              <label>
-                Login Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </label>
+          <div className="control-grid">
+            <section className="control-section">
+              <div className="section-head">
+                <h3>Authentication</h3>
+                <p>Sign in once and continue with role-based actions.</p>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Login Email
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="teacher@domain.com"
+                  />
+                </label>
+
+                <label>
+                  Login Password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="control-section">
+              <div className="section-head">
+                <h3>Class Controls</h3>
+                <p>Actions are locked to backend lifecycle state.</p>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Class ID
+                  <input
+                    value={classId}
+                    onChange={(e) => setClassId(e.target.value)}
+                    placeholder="e.g. ba2f09b1-fede..."
+                  />
+                </label>
+
+                <label>
+                  Role
+                  <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                    <option value="teacher">Teacher</option>
+                    <option value="student">Student</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <details className="token-details">
+            <summary>Advanced: Backend Access Token</summary>
+            <div className="token-panel">
+              <input
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                placeholder="Supabase access token"
+              />
+            </div>
+          </details>
+
+          <div className="action-row polished">
+            {!authUserEmail ? (
+              <button
+                className="btn btn-secondary"
+                disabled={authLoading || !email || !password}
+                onClick={handleLogin}
+              >
+                {authLoading ? "Logging in..." : "Login"}
+              </button>
+            ) : (
+              <button className="btn btn-secondary" onClick={handleLogoutAuth}>
+                Logout ({authUserEmail})
+              </button>
+            )}
+            <button className="btn btn-secondary" disabled={!canStart} onClick={handleStartClass}>
+              {starting ? "Starting..." : "Start Class"}
+            </button>
+            <button className="btn btn-primary glow" disabled={!canSubmitJoin} onClick={handleJoin}>
+              {joining ? "Requesting..." : "Join Class"}
+            </button>
+            <button className="btn btn-secondary" disabled={!canEnd} onClick={handleEndClass}>
+              {ending ? "Ending..." : "End Class"}
+            </button>
+          </div>
+
+          <div className="status-row polished">
+            <span>Session: {isLoggedIn ? "Authenticated" : "Not logged in"}</span>
+            <span>Room: {roomName || "-"}</span>
+            <span>Participants: {participantCount}</span>
+            <span>LiveKit URL: {process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "ws://localhost:7880"}</span>
+          </div>
+
+          {error ? <p className="error-text">{error}</p> : null}
+        </motion.section>
+      ) : (
+        <section className="coaching-room-wrap">
+          <header className="coaching-status-bar">
+            <div className="coaching-status-left">
+              <span className="live-dot" />
+              <span className="live-label">LIVE</span>
+              <span className="status-title">PCM - {roomName || classId || "Classroom"}</span>
+            </div>
+            <div className="coaching-status-right">
+              <span>{participantCount} Students</span>
+              <span>{connectionLabel}</span>
+              <span className="secure-pill">Secure Connection</span>
+              <span className="record-pill">REC</span>
+            </div>
+          </header>
+
+          {teacherJoinedNotice ? <div className="trust-toast">Teacher joined</div> : null}
+          {teacherLeft ? <div className="trust-toast warn">Teacher disconnected</div> : null}
+
+          <section className="stage-shell">
+            <div className="stage-main" ref={mainVideoWrapRef}>
+              {!isTeacherLike ? (
+                <span className="stage-empty-label">Teacher Stream</span>
+              ) : (
+                <span className="stage-empty-label">Your Live Feed</span>
+              )}
+            </div>
+
+            <div className="stage-preview">
+              <div className="stage-preview-video" ref={localPreviewWrapRef}>
+              </div>
+              <div className="stage-preview-meta">
+                <span>{authUserEmail ?? role}</span>
+                <span>{cameraLive ? "Camera Live" : "Camera Off"}</span>
+              </div>
             </div>
           </section>
 
-          <section className="control-section">
-            <div className="section-head">
-              <h3>Class Controls</h3>
-              <p>Actions are locked to backend lifecycle state.</p>
-            </div>
-            <div className="form-grid">
-              <label>
-                Class ID
-                <input
-                  value={classId}
-                  onChange={(e) => setClassId(e.target.value)}
-                  placeholder="e.g. ba2f09b1-fede..."
-                />
-              </label>
-
-              <label>
-                Role
-                <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                  <option value="teacher">Teacher</option>
-                  <option value="student">Student</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-            </div>
-          </section>
-        </div>
-
-        <details className="token-details">
-          <summary>Advanced: Backend Access Token</summary>
-          <div className="token-panel">
-            <input
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Supabase access token"
-            />
-          </div>
-        </details>
-
-        <div className="action-row polished">
-          {!authUserEmail ? (
-            <button
-              className="btn btn-secondary"
-              disabled={authLoading || !email || !password}
-              onClick={handleLogin}
-            >
-              {authLoading ? "Logging in..." : "Login"}
+          <footer className="control-dock">
+            <button className="dock-btn" onClick={handleToggleCamera} disabled={role !== "teacher"}>
+              {cameraLive ? "🎥" : "🚫🎥"}
             </button>
-          ) : (
-            <button className="btn btn-secondary" onClick={handleLogoutAuth}>
-              Logout ({authUserEmail})
+            <button className="dock-btn" onClick={handleToggleMic} disabled={role !== "teacher"}>
+              {micLive ? "🎤" : "🔇"}
             </button>
-          )}
-          <button className="btn btn-secondary" disabled={!canStart} onClick={handleStartClass}>
-            {starting ? "Starting..." : "Start Class"}
-          </button>
-          <button className="btn btn-primary glow" disabled={!canSubmitJoin} onClick={handleJoin}>
-            {joining ? "Requesting..." : "Join Class"}
-          </button>
-          <button className="btn btn-secondary" disabled={!canEnd} onClick={handleEndClass}>
-            {ending ? "Ending..." : "End Class"}
-          </button>
-          <button className="btn btn-muted" disabled={!canDisconnect} onClick={handleDisconnect}>
-            Disconnect
-          </button>
-        </div>
-
-        <div className="status-row polished">
-          <span>Session: {isLoggedIn ? "Authenticated" : "Not logged in"}</span>
-          <span>Room: {roomName || "-"}</span>
-          <span>Participants: {participantCount}</span>
-          {teacherLeft ? <span>Teacher has left the session</span> : null}
-          <span>LiveKit URL: {process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "ws://localhost:7880"}</span>
-        </div>
-
-        {error ? <p className="error-text">{error}</p> : null}
-      </motion.section>
-
-      <section className="video-grid">
-        <article className="video-card polished">
-          <div className="video-card-head">
-            <h2>Teacher / Local Feed</h2>
-            <span>{role === "teacher" ? (cameraLive ? "Camera Live" : "Camera Off") : "Viewer mode"}</span>
-          </div>
-          <div className="video-stage" ref={localVideoWrapRef} />
-        </article>
-
-        <article className="video-card polished">
-          <div className="video-card-head">
-            <h2>Remote Stream</h2>
-            <span>Teacher broadcast</span>
-          </div>
-          <div className="video-stage" ref={remoteVideoWrapRef} />
-        </article>
-      </section>
+            <button className="dock-btn" disabled>
+              👥 {participantCount}
+            </button>
+            <button className="dock-btn leave" onClick={handleDisconnect} disabled={!canDisconnect}>
+              🚪 Leave
+            </button>
+            {(role === "teacher" || role === "admin") ? (
+              <button className="dock-btn end" onClick={handleEndClass} disabled={!canEnd}>
+                ⛔ End Class
+              </button>
+            ) : null}
+          </footer>
+        </section>
+      )}
     </main>
   );
 }

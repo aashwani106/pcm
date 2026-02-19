@@ -1,9 +1,17 @@
-# PCM (Coaching Institute Management) - Mobile App
+# PCM (Coaching Institute Management) - End-to-End Platform
 
-A professional, minimal, and secure mobile application designed for local coaching institutes to manage attendance, student performance, and parent communication effectively.
+A professional, minimal, and secure end-to-end platform for coaching institutes: attendance integrity, live classes, academic workflows, and parent communication in one system.
 
 ## 🚀 Overview
-The PCM app is built to solve the challenges of proxy attendance and fragmented communication in small-to-medium educational centers. It leverages **GPS Geofencing** and **Facial Recognition** to ensure high-integrity attendance records without expensive hardware.
+PCM is built to solve proxy attendance, fragmented communication, and disconnected live-class operations in coaching institutes.  
+
+It combines:
+- Mobile workflows for students, parents, and admins
+- Web classroom and conversion website
+- Secure backend APIs with role-based controls
+- Real-time live streaming via LiveKit
+
+The result is a single operational stack for **attendance + communication + academics + live delivery**.
 
 ---
 
@@ -29,6 +37,12 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 *   **Class Lifecycle Controls:** Start, join, and end controls with secure token issuance from backend.
 *   **Live Session UX:** Connection state, participant count, reconnect handling, and teacher presence indicators.
 
+### 5. Operations & Admin Controls
+*   **Admin Dashboard:** Date-wise attendance overview with present/absent summary.
+*   **Student Lifecycle Controls:** Status-based controls (active/paused/left) and attendance enable/disable.
+*   **Attendance Overrides:** Manual admin marking with reason and audit fields.
+*   **Calendar Visibility:** Student/parent/admin attendance calendars with status context.
+
 ---
 
 ## 🛠 Tech Stack
@@ -41,7 +55,7 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 ### Frontend (Web)
 *   **Framework:** Next.js (App Router)
 *   **Animation:** Framer Motion
-*   **Use Cases:** Landing page, course discovery, and live class web classroom
+*   **Use Cases:** Landing page, pricing conversion, course discovery, and live class web classroom
 
 ### Backend & Infrastructure
 *   **Platform:** Supabase (Postgres, Auth, Storage, Edge Functions)
@@ -56,7 +70,7 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 This project follows a Monorepo architecture to keep the mobile app, backend, and shared logic in one place.
 
 ```text
-pcm-app/
+pcm-v2/
 ├── apps/
 │   ├── mobile/           # React Native Expo App
 │   ├── website/          # Next.js Web App (courses + live classes)
@@ -92,18 +106,41 @@ The app follows a **Premium Minimalist** aesthetic to ensure ease of use for par
     cd pcm
     ```
 
-2.  **Setup Mobile App**
+2.  **Install Dependencies (Monorepo Root)**
     ```bash
-    cd apps/mobile
     npm install
-    npx expo start
     ```
 
-3.  **Environment Variables**
-    Create a `.env` in `apps/mobile/` with:
+3.  **Setup Backend**
+    ```bash
+    npm --workspace apps/backend run dev
+    ```
+
+4.  **Setup Mobile App**
+    ```bash
+    npm --workspace apps/mobile run start
+    ```
+
+5.  **Setup Website**
+    ```bash
+    npm --workspace apps/website run dev
+    ```
+
+6.  **Environment Variables**
+    Create required `.env` files (mobile/backend/website).  
+    Example for `apps/mobile/.env`:
     ```bash
     EXPO_PUBLIC_SUPABASE_URL=your_url
     EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key
+    ```
+
+    Example for `apps/backend/.env` (partial):
+    ```bash
+    SUPABASE_URL=your_url
+    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+    LIVEKIT_API_KEY=your_livekit_key
+    LIVEKIT_API_SECRET=your_livekit_secret
+    LIVEKIT_URL=ws://localhost:7880
     ```
 
 ---
@@ -113,6 +150,10 @@ For more detailed technical information, refer to:
 *   [Requirements](./docs/requirement.md)
 *   [High-Level Design](./docs/hld.md)
 *   [Project Structure](./docs/project-structure.md)
+*   [Streaming Architecture](./docs/streaming-architecture.md)
+*   [Streaming Flow](./docs/streaming-flow.md)
+*   [Streaming Roles](./docs/streaming-roles.md)
+*   [Streaming Infrastructure](./docs/streaming-infrastructure.md)
 
 ---
 

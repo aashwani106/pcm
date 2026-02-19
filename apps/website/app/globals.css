@@ -886,6 +886,434 @@ a {
   color: #d2dae7;
 }
 
+.landing-root {
+  background: #f3f0e7;
+  color: #111312;
+}
+
+.landing-section,
+.landing-hero {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 4.5rem 1.25rem;
+}
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 1.4rem;
+  align-items: center;
+  min-height: 82vh;
+}
+
+.landing-eyebrow,
+.landing-label {
+  margin: 0 0 0.7rem;
+  color: #3f4b43;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.landing-title {
+  margin: 0;
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.landing-subtitle {
+  margin: 1rem 0 0;
+  max-width: 58ch;
+  color: #455249;
+  line-height: 1.65;
+}
+
+.landing-actions {
+  margin-top: 1.45rem;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.landing-btn {
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: transform 0.18s ease, background 0.2s ease;
+}
+
+.landing-btn:hover {
+  transform: translateY(-1px);
+}
+
+.landing-btn-primary {
+  background: #1f5d39;
+  color: #fff;
+}
+
+.landing-btn-secondary {
+  background: #ece8dd;
+  border-color: #d4cebf;
+  color: #1a1f1b;
+}
+
+.landing-hero-panel {
+  background: #ece8dd;
+  border: 1px solid #d8d1c2;
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: 0 16px 40px rgba(25, 38, 26, 0.08);
+}
+
+.landing-hero-mock-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.84rem;
+  color: #3e463f;
+}
+
+.landing-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #de5454;
+}
+
+.landing-mock-state {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: #245438;
+  border: 1px solid #9dc5ac;
+  background: #dfeee4;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+}
+
+.landing-hero-mock-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.landing-metric-card {
+  border-radius: 12px;
+  background: #f7f4ec;
+  border: 1px solid #dcd5c8;
+  padding: 0.8rem;
+}
+
+.landing-metric-card p {
+  margin: 0;
+  color: #4a554d;
+  font-size: 0.78rem;
+}
+
+.landing-metric-card h3 {
+  margin: 0.4rem 0 0;
+  font-size: 1.1rem;
+}
+
+.landing-metric-card.wide {
+  grid-column: 1 / -1;
+}
+
+.landing-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.landing-stat-card {
+  border-radius: 14px;
+  border: 1px solid #d9d2c4;
+  background: #ece8dd;
+  padding: 1rem;
+}
+
+.landing-stat-card h3 {
+  margin: 0;
+  font-size: 1.85rem;
+}
+
+.landing-stat-card p {
+  margin: 0.35rem 0 0;
+  color: #4f5850;
+}
+
+.landing-surface {
+  background: #ece8dd;
+  border-radius: 22px;
+  border: 1px solid #ddd4c4;
+}
+
+.landing-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.3rem;
+}
+
+.landing-h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  line-height: 1.2;
+}
+
+.landing-step-list {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  color: #2b332d;
+  line-height: 1.8;
+}
+
+.landing-feature-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.landing-feature-item {
+  border-radius: 10px;
+  border: 1px solid #d7d0c2;
+  background: #f5f2e9;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.landing-feature-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f7049;
+}
+
+.landing-feature-item p {
+  margin: 0;
+}
+
+.landing-section-head {
+  margin-bottom: 1rem;
+}
+
+.landing-courses-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.landing-teacher-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.landing-teacher-card {
+  border-radius: 14px;
+  border: 1px solid #d8d0c2;
+  background: #ece8dd;
+  padding: 0.8rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-teacher-card:hover {
+  border-color: #c6bfaf;
+  box-shadow: 0 10px 24px rgba(18, 28, 19, 0.08);
+}
+
+.landing-teacher-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid #cbc3b4;
+  object-fit: cover;
+}
+
+.landing-teacher-card h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.landing-teacher-card p {
+  margin: 0.2rem 0 0;
+  color: #23583a;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.landing-teacher-card span {
+  display: block;
+  margin-top: 0.2rem;
+  color: #4f5951;
+  font-size: 0.76rem;
+}
+
+.landing-course-card {
+  border-radius: 14px;
+  border: 1px solid #d8d0c2;
+  background: #ece8dd;
+  padding: 0.7rem;
+}
+
+.landing-course-image {
+  width: 100%;
+  height: 140px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.7rem;
+}
+
+.landing-course-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.landing-course-card h3 {
+  margin: 0;
+}
+
+.landing-course-card p {
+  margin: 0.55rem 0 0;
+  color: #4b554d;
+  line-height: 1.6;
+}
+
+.landing-testimonials {
+  padding-top: 2rem;
+}
+
+.landing-achiever-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.landing-achiever-card {
+  border-radius: 14px;
+  border: 1px solid #d9d1c3;
+  background: #ece8dd;
+  padding: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-achiever-card:hover {
+  border-color: #c6bfaf;
+  box-shadow: 0 10px 24px rgba(18, 28, 19, 0.08);
+}
+
+.landing-achiever-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #cfc7b7;
+}
+
+.landing-achiever-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.landing-achiever-card p {
+  margin: 0.15rem 0 0;
+  color: #4c564e;
+  font-size: 0.78rem;
+}
+
+.landing-achiever-card strong {
+  margin-left: auto;
+  color: #1f5d39;
+  font-size: 1rem;
+}
+
+.landing-testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.landing-testimonial-card {
+  border-radius: 14px;
+  border: 1px solid #d9d1c3;
+  background: #ece8dd;
+  padding: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-testimonial-card:hover {
+  border-color: #c6bfaf;
+  box-shadow: 0 10px 24px rgba(18, 28, 19, 0.08);
+}
+
+.landing-testimonial-card p {
+  margin: 0.75rem 0 0;
+  line-height: 1.7;
+}
+
+.landing-testimonial-head {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.landing-testimonial-head img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #cbc3b4;
+}
+
+.landing-testimonial-head h4 {
+  margin: 0;
+  color: #2f3a32;
+}
+
+.landing-testimonial-head span {
+  display: block;
+  color: #4f5951;
+  font-size: 0.76rem;
+}
+
+.landing-cta {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem;
+  border-radius: 18px;
+  background: #131a15;
+  color: #f4f7f4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.landing-cta h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.landing-footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 2.4rem;
+  color: #4f5951;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
@@ -976,5 +1404,32 @@ a {
     bottom: 4.5rem;
     left: 0.75rem;
     right: 0.75rem;
+  }
+
+  .landing-hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 2.4rem;
+    padding-bottom: 2.4rem;
+  }
+
+  .landing-actions {
+    flex-wrap: wrap;
+  }
+
+  .landing-stats,
+  .landing-grid-2,
+  .landing-teacher-grid,
+  .landing-achiever-grid,
+  .landing-courses-grid,
+  .landing-testimonial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-cta {
+    margin: 0 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 2rem 1rem;
   }
 }

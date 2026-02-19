@@ -8,10 +8,13 @@ import { connectToRoom } from "../../lib/livekit";
 
 type Role = "teacher" | "student" | "admin";
 type ClassStatus = "scheduled" | "live" | "ended";
+type RoomState = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
+const SESSION_STORAGE_KEY = "pcm_classroom_session_v1";
 
 type ClassStatePayload = {
   id: string;
   status: ClassStatus;
+  teacher_id: string;
   livekit_room_name: string;
   started_at?: string | null;
   ended_at?: string | null;
@@ -25,6 +28,23 @@ function detachVideoElements(container: HTMLDivElement | null) {
   container.innerHTML = "";
 }
 
+function attachRemoteTrack(
+  room: Room,
+  container: HTMLDivElement | null
+) {
+  if (!container) return;
+  detachVideoElements(container);
+
+  for (const participant of room.remoteParticipants.values()) {
+    for (const pub of participant.trackPublications.values()) {
+      if (pub.track?.kind === Track.Kind.Video) {
+        container.appendChild(pub.track.attach());
+        return;
+      }
+    }
+  }
+}
+
 export default function ClassroomPage() {
   const [classId, setClassId] = useState("");
   const [role, setRole] = useState<Role>("student");
@@ -35,14 +55,16 @@ export default function ClassroomPage() {
   const [authUserEmail, setAuthUserEmail] = useState<string | null>(null);
   const [roomName, setRoomName] = useState("");
   const [joining, setJoining] = useState(false);
-  const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Idle");
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
+  const [roomState, setRoomState] = useState<RoomState>("idle");
   const [cameraLive, setCameraLive] = useState(false);
+  const [teacherLeft, setTeacherLeft] = useState(false);
+  const [classTeacherId, setClassTeacherId] = useState<string | null>(null);
   const [classStatus, setClassStatus] = useState<ClassStatus | null>(null);
   const [classStatusLoading, setClassStatusLoading] = useState(false);
 
@@ -51,6 +73,8 @@ export default function ClassroomPage() {
   const remoteVideoWrapRef = useRef<HTMLDivElement>(null);
 
   const isLoggedIn = Boolean(authUserEmail && accessToken);
+  const isJoinableRoomState = roomState === "idle" || roomState === "disconnected";
+  const isConnected = roomState === "connected" || roomState === "reconnecting";
 
   const isClassScheduled = classStatus === "scheduled";
   const isClassLive = classStatus === "live";
@@ -60,9 +84,9 @@ export default function ClassroomPage() {
       classId.trim().length > 0 &&
       accessToken.trim().length > 0 &&
       !joining &&
-      !connected &&
-      isClassLive,
-    [classId, accessToken, joining, connected, isClassLive]
+      isClassLive &&
+      isJoinableRoomState,
+    [classId, accessToken, joining, isClassLive, isJoinableRoomState]
   );
 
   const canStart =
@@ -70,7 +94,7 @@ export default function ClassroomPage() {
     role === "teacher" &&
     classId.trim().length > 0 &&
     !starting &&
-    !connected &&
+    isJoinableRoomState &&
     isClassScheduled;
 
   const canEnd =
@@ -80,11 +104,11 @@ export default function ClassroomPage() {
     !ending &&
     isClassLive;
 
-  const canDisconnect = connected;
+  const canDisconnect = roomState !== "idle" && roomState !== "disconnected";
 
   const statusTone = error
     ? "error"
-    : connected
+    : isConnected
       ? "success"
       : joining || starting || ending || authLoading || classStatusLoading
         ? "busy"
@@ -106,6 +130,7 @@ export default function ClassroomPage() {
     async (silent = false) => {
       if (!classId.trim() || !accessToken.trim()) {
         setClassStatus(null);
+        setClassTeacherId(null);
         setRoomName("");
         return;
       }
@@ -128,9 +153,11 @@ export default function ClassroomPage() {
         }
 
         setClassStatus(payload.status);
+        setClassTeacherId(payload.teacher_id ?? null);
         setRoomName(payload.livekit_room_name ?? "");
       } catch (e) {
         setClassStatus(null);
+        setClassTeacherId(null);
         setRoomName("");
         setError(e instanceof Error ? e.message : "Failed to fetch class state.");
       } finally {
@@ -155,11 +182,61 @@ export default function ClassroomPage() {
   }, [isLoggedIn, classId, refreshClassState]);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        classId?: string;
+        role?: Role;
+        accessToken?: string;
+        authUserEmail?: string;
+        email?: string;
+      };
+      if (parsed.classId) setClassId(parsed.classId);
+      if (parsed.role) setRole(parsed.role);
+      if (parsed.accessToken) setAccessToken(parsed.accessToken);
+      if (parsed.authUserEmail) setAuthUserEmail(parsed.authUserEmail);
+      if (parsed.email) setEmail(parsed.email);
+      if (parsed.accessToken && parsed.authUserEmail) {
+        setStatus("Session restored");
+      }
+    } catch {
+      // Ignore invalid local storage payload.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const payload = {
+        classId,
+        role,
+        accessToken,
+        authUserEmail,
+        email,
+      };
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore local storage failures.
+    }
+  }, [classId, role, accessToken, authUserEmail, email]);
+
+  useEffect(() => {
     return () => {
       roomRef.current?.disconnect();
       roomRef.current = null;
       detachVideoElements(localVideoWrapRef.current);
       detachVideoElements(remoteVideoWrapRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      roomRef.current?.disconnect();
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []);
 
@@ -187,7 +264,10 @@ export default function ClassroomPage() {
     setAuthUserEmail(null);
     setPassword("");
     setClassStatus(null);
+    setClassTeacherId(null);
     setRoomName("");
+    setRoomState("idle");
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
     setStatus("Logged out");
   }
 
@@ -196,6 +276,7 @@ export default function ClassroomPage() {
 
     setError(null);
     setJoining(true);
+    setRoomState("connecting");
     setStatus("Requesting class join token...");
 
     try {
@@ -210,31 +291,59 @@ export default function ClassroomPage() {
         throw new Error(payload?.message || "Failed to join class.");
       }
 
+      roomRef.current?.disconnect();
       const room = await connectToRoom(payload.token);
       roomRef.current = room;
-      setConnected(true);
+      setRoomState("connecting");
+      setTeacherLeft(false);
       setRoomName(payload.roomName);
       setConnectionState(room.state);
+      if (room.state === ConnectionState.Connected) {
+        setRoomState("connected");
+      }
       updateParticipantCount(room);
       updateCameraIndicator(room);
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         console.log("Participant joined:", participant.identity);
+        if (role === "student" && classTeacherId && participant.identity === classTeacherId) {
+          setTeacherLeft(false);
+        }
         updateParticipantCount(room);
+        attachRemoteTrack(room, remoteVideoWrapRef.current);
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         console.log("Participant left:", participant.identity);
+        if (role === "student" && classTeacherId && participant.identity === classTeacherId) {
+          setTeacherLeft(true);
+          setStatus("Teacher has left the session");
+        }
         updateParticipantCount(room);
+        attachRemoteTrack(room, remoteVideoWrapRef.current);
       });
 
       room.on(RoomEvent.ConnectionStateChanged, (nextState) => {
         setConnectionState(nextState);
+        switch (nextState) {
+          case ConnectionState.Connecting:
+            setRoomState("connecting");
+            break;
+          case ConnectionState.Connected:
+            setRoomState("connected");
+            break;
+          case ConnectionState.Reconnecting:
+            setRoomState("reconnecting");
+            break;
+          case ConnectionState.Disconnected:
+            setRoomState("disconnected");
+            break;
+        }
       });
 
       room.on(RoomEvent.Disconnected, () => {
         console.log("Room disconnected");
-        setConnected(false);
+        setRoomState("disconnected");
         setConnectionState(ConnectionState.Disconnected);
         setParticipantCount(0);
         setCameraLive(false);
@@ -247,6 +356,10 @@ export default function ClassroomPage() {
         if (track.kind !== Track.Kind.Video || !remoteVideoWrapRef.current) return;
         detachVideoElements(remoteVideoWrapRef.current);
         remoteVideoWrapRef.current.appendChild(track.attach());
+      });
+
+      room.on(RoomEvent.TrackUnsubscribed, () => {
+        attachRemoteTrack(room, remoteVideoWrapRef.current);
       });
 
       room.on(RoomEvent.LocalTrackPublished, () => {
@@ -277,11 +390,13 @@ export default function ClassroomPage() {
         }
         updateCameraIndicator(room);
       }
+      attachRemoteTrack(room, remoteVideoWrapRef.current);
 
       setStatus(role === "teacher" ? "Live as teacher" : "Connected as viewer");
       await refreshClassState(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to connect room.");
+      setRoomState("disconnected");
       setStatus("Join failed");
     } finally {
       setJoining(false);
@@ -350,7 +465,7 @@ export default function ClassroomPage() {
   function handleDisconnect() {
     roomRef.current?.disconnect();
     roomRef.current = null;
-    setConnected(false);
+    setRoomState("disconnected");
     setConnectionState(ConnectionState.Disconnected);
     setParticipantCount(0);
     setCameraLive(false);
@@ -489,6 +604,7 @@ export default function ClassroomPage() {
           <span>Session: {isLoggedIn ? "Authenticated" : "Not logged in"}</span>
           <span>Room: {roomName || "-"}</span>
           <span>Participants: {participantCount}</span>
+          {teacherLeft ? <span>Teacher has left the session</span> : null}
           <span>LiveKit URL: {process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "ws://localhost:7880"}</span>
         </div>
 

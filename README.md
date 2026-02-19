@@ -23,6 +23,12 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 *   **Quizzes & Tests:** Create and attempt quizzes with time limits and auto-submission.
 *   **Study Materials:** Secure access to PDFs, notes, and question sheets uploaded by tutors.
 
+### 4. Live Classes
+*   **Low-Latency Classroom Streaming:** Teacher-to-student live classes powered by LiveKit (WebRTC SFU).
+*   **Role-Based Access:** Only teachers can publish; students join as subscribers.
+*   **Class Lifecycle Controls:** Start, join, and end controls with secure token issuance from backend.
+*   **Live Session UX:** Connection state, participant count, reconnect handling, and teacher presence indicators.
+
 ---
 
 ## 🛠 Tech Stack
@@ -32,10 +38,16 @@ The PCM app is built to solve the challenges of proxy attendance and fragmented 
 *   **Animation:** Lottie (for premium splash & micro-interactions), Reanimated
 *   **Styling:** Minimalist Design System (Beige & Green palette)
 
+### Frontend (Web)
+*   **Framework:** Next.js (App Router)
+*   **Animation:** Framer Motion
+*   **Use Cases:** Landing page, course discovery, and live class web classroom
+
 ### Backend & Infrastructure
 *   **Platform:** Supabase (Postgres, Auth, Storage, Edge Functions)
 *   **API Layer:** Node.js (Business logic & Attendance processing)
 *   **Biometrics:** Python-based Face Recognition Service (processing embeddings only)
+*   **Live Streaming:** Self-hosted LiveKit (WebRTC SFU) for one-to-many classroom broadcasting
 
 ---
 

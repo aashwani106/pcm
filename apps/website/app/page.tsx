@@ -94,6 +94,7 @@ export default function HomePage() {
 
       <section className="landing-section landing-testimonials">
         <div className="landing-section-head">
+          <p className="landing-meta">Verified Results 2024 Batch</p>
           <p className="landing-label">Board Results</p>
           <h2 className="landing-h2">Students scoring 90%+ in board exams.</h2>
         </div>

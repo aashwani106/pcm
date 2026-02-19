@@ -18,14 +18,16 @@ export function HeroSection() {
         transition={{ staggerChildren: 0.1 }}
       >
         <motion.p variants={fadeUp} className="landing-eyebrow">
-          Performance-Driven PCM Coaching
+          By PCM Coaching
         </motion.p>
         <motion.h1 variants={fadeUp} className="landing-title">
-          Serious Live Classes for Serious Students.
+          Discipline. Structure. Results.
+          <br />
+          Live PCM Coaching That Delivers.
         </motion.h1>
         <motion.p variants={fadeUp} className="landing-subtitle">
-          Structured physics, chemistry, and mathematics coaching with live attendance,
-          disciplined sessions, and parent-facing progress accountability.
+          Structured PCM coaching with live attendance tracking, disciplined sessions,
+          and parent-visible progress.
         </motion.p>
         <motion.div variants={fadeUp} className="landing-actions">
           <Link href="/courses" className="landing-btn landing-btn-primary">
